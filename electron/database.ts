@@ -1,0 +1,160 @@
+import initSqlJs, { Database } from "sql.js";
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  renameSync,
+  mkdirSync,
+} from "node:fs";
+import { dirname } from "node:path";
+import { randomUUID } from "node:crypto";
+import { z } from "zod";
+import type { Snapshot, NewOrder } from "../src/types";
+export const orderSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    store: z.string().trim().min(1).max(80),
+    category: z.string().trim().min(1).max(50),
+    total: z.number().finite().min(0).max(10000000),
+    status: z.enum(["Delivered", "In transit", "Processing", "Cancelled"]),
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .refine(
+        (s) =>
+          !isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s,
+      ),
+  })
+  .strict();
+export class Store {
+  private constructor(
+    private db: Database,
+    private path: string | undefined,
+    private restore: (bytes: Uint8Array) => Database,
+  ) {}
+  static async open(path?: string) {
+    const SQL = await initSqlJs({
+      locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm"),
+    });
+    const store = new Store(
+      path && existsSync(path)
+        ? new SQL.Database(readFileSync(path))
+        : new SQL.Database(),
+      path,
+      (bytes) => new SQL.Database(bytes),
+    );
+    store.migrate();
+    return store;
+  }
+  private migrate() {
+    this.db.run(
+      "PRAGMA foreign_keys=ON; CREATE TABLE IF NOT EXISTS migrations(version INTEGER PRIMARY KEY)",
+    );
+    const version =
+      this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
+    if (Number(version) > 1) throw new Error("Unsupported database version");
+    if (Number(version) < 1) {
+      this.db.run(
+        `BEGIN; CREATE TABLE orders(id TEXT PRIMARY KEY,name TEXT NOT NULL,store TEXT NOT NULL,category TEXT NOT NULL,total REAL NOT NULL CHECK(total>=0),status TEXT NOT NULL CHECK(status IN ('Delivered','In transit','Processing','Cancelled')),date TEXT NOT NULL); CREATE TABLE collection(id TEXT PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),purchase REAL NOT NULL,market REAL NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO migrations VALUES(1);`,
+      );
+      this.seed();
+      this.db.run("COMMIT");
+      this.persist();
+    }
+  }
+  private seed() {
+    const names = [
+      ["Air Jordan 1 Retro High", "Nike", "Sneakers", 180],
+      [
+        "Pokémon 151 Elite Trainer Box",
+        "Pokémon Center",
+        "Trading cards",
+        54.99,
+      ],
+      ["Kaws: Small Lie", "StockX", "Art & figures", 289],
+      ["New Balance 990v6", "New Balance", "Sneakers", 199.99],
+      ["LEGO Porsche 911", "LEGO", "Collectibles", 169.99],
+      ["Dunk Low Vintage Green", "Nike", "Sneakers", 115],
+      ["One Piece Booster Box", "Local store", "Trading cards", 124.99],
+      ["Bearbrick Series 48", "Medicom", "Art & figures", 89],
+    ];
+    for (let i = 0; i < 36; i++) {
+      const n = names[i % names.length];
+      const d = new Date();
+      d.setDate(d.getDate() - Math.floor(i * 2.4));
+      this.db.run("INSERT INTO orders VALUES(?,?,?,?,?,?,?)", [
+        randomUUID(),
+        String(n[0]),
+        String(n[1]),
+        String(n[2]),
+        Number(n[3]),
+        i < 3 ? "In transit" : i < 6 ? "Processing" : "Delivered",
+        d.toISOString().slice(0, 10),
+      ]);
+    }
+    names
+      .slice(0, 6)
+      .forEach((n, i) =>
+        this.db.run("INSERT INTO collection VALUES(?,?,?,?,?,?)", [
+          randomUUID(),
+          String(n[0]),
+          String(n[2]),
+          i + 1,
+          Number(n[3]),
+          Math.round(Number(n[3]) * (1.15 + i * 0.08)),
+        ]),
+      );
+    this.db.run(
+      "INSERT INTO tasks VALUES('sample-1','Collection price watch','Paused'),('sample-2','Shipment updates','Paused'),('sample-3','Weekly spending report','Paused')",
+    );
+  }
+  private rows(table: string) {
+    const result = this.db.exec(`SELECT * FROM ${table}`)[0];
+    return result
+      ? result.values.map((row) =>
+          Object.fromEntries(result.columns.map((c, i) => [c, row[i]])),
+        )
+      : [];
+  }
+  snapshot(): Snapshot {
+    return {
+      orders: this.rows("orders").sort((a, b) =>
+        String(b.date).localeCompare(String(a.date)),
+      ),
+      collection: this.rows("collection"),
+      tasks: this.rows("tasks"),
+    } as Snapshot;
+  }
+  addOrder(input: NewOrder) {
+    const o = orderSchema.parse(input);
+    const before = this.db.export();
+    this.db.run("BEGIN");
+    try {
+      this.db.run("INSERT INTO orders VALUES(?,?,?,?,?,?,?)", [
+        randomUUID(),
+        o.name,
+        o.store,
+        o.category,
+        o.total,
+        o.status,
+        o.date,
+      ]);
+      this.db.run("COMMIT");
+      this.persist();
+    } catch (e) {
+      this.db.close();
+      this.db = this.restore(before);
+      throw e;
+    }
+    return this.snapshot();
+  }
+  private persist() {
+    if (!this.path) return;
+    mkdirSync(dirname(this.path), { recursive: true });
+    writeFileSync(this.path + ".tmp", this.db.export(), { mode: 0o600 });
+    renameSync(this.path + ".tmp", this.path);
+  }
+  close() {
+    this.db.close();
+  }
+}
