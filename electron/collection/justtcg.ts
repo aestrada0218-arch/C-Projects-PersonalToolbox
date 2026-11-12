@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { CatalogCard, CatalogVariant } from "../../src/collection-types";
 import type { CollectionRepository } from "./store";
 import { tcgProductId } from "./model";
+import { catalogNameQuery, rankCatalogCards } from "../../src/catalog-display";
 const rawVariant = z.object({
   id: z.string().min(1).max(512),
   uuid: z.string().min(1).max(512).nullish(),
@@ -68,7 +69,11 @@ export function normalizeCard(raw: unknown, checkedAt: string): CatalogCard {
     }),
   };
 }
-export type ProviderResponse = { cards: CatalogCard[]; hasMore: boolean };
+export type ProviderResponse = {
+  cards: CatalogCard[];
+  hasMore: boolean;
+  searchQuery?: string;
+};
 export interface MarketDataProvider {
   cancel?(): void;
   games(key: string): Promise<{ id: string; name: string }[]>;
@@ -210,7 +215,7 @@ export class JustTcgProvider implements MarketDataProvider {
     };
     if (productId) params.tcgplayerId = productId;
     else {
-      params.q = input.query;
+      params.q = catalogNameQuery(input.query);
       if (input.game) params.game = input.game;
     }
     const data = await this.request(key, "/cards", params);
@@ -218,8 +223,12 @@ export class JustTcgProvider implements MarketDataProvider {
       throw Error("PRICE_RESPONSE");
     const checkedAt = new Date().toISOString();
     return {
-      cards: data.data.map((card: unknown) => normalizeCard(card, checkedAt)),
+      cards: rankCatalogCards(
+        data.data.map((card: unknown) => normalizeCard(card, checkedAt)),
+        input.query,
+      ),
       hasMore: Boolean(data.meta?.hasMore),
+      searchQuery: productId || params.q,
     };
   }
   async batch(key: string, variantIds: string[]) {

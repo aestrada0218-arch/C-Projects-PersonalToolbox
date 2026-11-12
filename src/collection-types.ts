@@ -80,6 +80,7 @@ export type CatalogResult = {
   ok: boolean;
   cards: CatalogCard[];
   hasMore: boolean;
+  searchQuery?: string;
   error?: string;
   settings: PricingSettings;
 };

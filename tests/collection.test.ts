@@ -16,6 +16,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import initSqlJs from "sql.js";
+import {
+  catalogNameQuery,
+  rankCatalogCards,
+  tcgArtworkUrl,
+} from "../src/catalog-display";
 const raw = {
   id: "example-card",
   uuid: "card-stable",
@@ -41,6 +46,92 @@ const raw = {
 };
 const checked = "2026-11-12T12:00:00.000Z";
 const card = () => normalizeCard(structuredClone(raw), checked);
+it("maps exact catalog product IDs to artwork and rejects URLs, traversal and invalid identifiers", () => {
+  expect(tcgArtworkUrl("42382")).toBe(
+    "https://tcgplayer-cdn.tcgplayer.com/product/42382_in_400x400.jpg",
+  );
+  for (const id of [
+    null,
+    undefined,
+    "",
+    "0",
+    "../123",
+    "https://example.com/image.jpg",
+    "123?x=y",
+    "123/456",
+    "1234567890123",
+  ])
+    expect(tcgArtworkUrl(id)).toBeNull();
+});
+it("searches full marketplace titles by card name without splitting genuine hyphenated names and ranks exact title/set first", () => {
+  const title = "Mew - B/RGB - ME: 30th Celebration (30C)";
+  expect(catalogNameQuery(title)).toBe("Mew");
+  expect(catalogNameQuery("Mew ex - ME: 30th Celebration (30C)")).toBe(
+    "Mew ex",
+  );
+  for (const query of [
+    "Ho-Oh",
+    "Porygon-Z",
+    "Mr. Mime",
+    "Mew - B/RGB",
+    "12345",
+    "https://www.tcgplayer.com/product/12345/a-b",
+  ])
+    expect(catalogNameQuery(query)).toBe(query);
+  const related = {
+    ...card(),
+    id: "related",
+    name: "Mew",
+    setName: "Other Set",
+  };
+  const exact = {
+    ...card(),
+    id: "exact",
+    name: "Mew - B/RGB",
+    setName: "ME: 30th Celebration",
+  };
+  const sameSet = { ...related, id: "same-set", setName: exact.setName };
+  const cards = [related, sameSet, exact];
+  expect(rankCatalogCards(cards, title).map((c) => c.id)).toEqual([
+    "exact",
+    "same-set",
+    "related",
+  ]);
+  expect(cards[0].id).toBe("related");
+});
+it("sends only the card name for a full title, retains product-ID lookups and one request per page", async () => {
+  const db = await Store.open();
+  try {
+    const fetcher = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ data: [raw], meta: { hasMore: false } })),
+    );
+    const provider = new JustTcgProvider(
+      db.collection,
+      fetcher as typeof fetch,
+    );
+    const result = await provider.search(key, {
+      query: "Mew - B/RGB - ME: 30th Celebration (30C)",
+      game: "pokemon",
+      offset: 0,
+    });
+    expect(
+      new URL((fetcher.mock.calls[0] as any)[0]).searchParams.get("q"),
+    ).toBe("Mew");
+    expect(result.searchQuery).toBe("Mew");
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await provider.search(key, {
+      query: "https://www.tcgplayer.com/product/42382/charizard",
+      game: "",
+      offset: 0,
+    });
+    const params = new URL((fetcher.mock.calls[1] as any)[0]).searchParams;
+    expect(params.get("tcgplayerId")).toBe("42382");
+    expect(params.has("q")).toBe(false);
+  } finally {
+    db.close();
+  }
+});
 function setup(db: Store) {
   let key: PricingSecret | null = null;
   const vault = {

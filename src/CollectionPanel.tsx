@@ -37,6 +37,7 @@ import type {
   QuoteObservation,
 } from "./collection-types";
 import { amountToCents } from "./expense-types";
+import CardArtwork from "./CardArtwork";
 const money = (cents: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
     cents / 100,
@@ -79,6 +80,11 @@ export default function CollectionPanel({
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [lastSearch, setLastSearch] = useState({
+    query: "",
+    game: "",
+    searchQuery: "",
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -178,7 +184,7 @@ export default function CollectionPanel({
       setBusy(false);
     }
   }
-  async function search(text = query, nextOffset = 0) {
+  async function search(text = query, nextOffset = 0, searchGame = game) {
     if (running.current) return;
     setError("");
     setNotice("");
@@ -189,11 +195,13 @@ export default function CollectionPanel({
     running.current = true;
     setBusy(true);
     setCards([]);
+    setHasMore(false);
+    setLastSearch({ query: text, game: searchGame, searchQuery: "" });
     setSearched(true);
     try {
       const result = await window.toolbox!.searchCatalog({
         query: text,
-        game,
+        game: searchGame,
         offset: nextOffset,
       });
       setState((s) => ({ ...s, settings: result.settings }));
@@ -202,6 +210,11 @@ export default function CollectionPanel({
         return;
       }
       setCards(result.cards);
+      setLastSearch({
+        query: text,
+        game: searchGame,
+        searchQuery: result.searchQuery || text,
+      });
       setOffset(nextOffset);
       setHasMore(result.hasMore);
     } catch {
@@ -547,6 +560,27 @@ export default function CollectionPanel({
                   : ` · ${state.settings.monthlyRemaining} this billing month`}
               </span>
             </div>
+            {searched &&
+              !busy &&
+              state.settings.connected &&
+              lastSearch.searchQuery && (
+                <div className="catalog-results-heading" role="status">
+                  <span>
+                    <b>
+                      {cards.length}
+                      {hasMore ? "+" : ""} results
+                    </b>{" "}
+                    for “{lastSearch.searchQuery}”
+                  </span>
+                  {lastSearch.searchQuery !== lastSearch.query &&
+                    !/^https?:/i.test(lastSearch.query) && (
+                      <span className="catalog-title-hint">
+                        Searched the card name from your full product title.
+                        Closest title/set matches appear first on this page.
+                      </span>
+                    )}
+                </div>
+              )}
             {!!cards.length && (
               <div className="catalog-grid">
                 {cards.map((card) => (
@@ -580,14 +614,26 @@ export default function CollectionPanel({
                 <div className="expense-pagination">
                   <button
                     disabled={disabled || offset === 0}
-                    onClick={() => void search(query, Math.max(0, offset - 20))}
+                    onClick={() =>
+                      void search(
+                        lastSearch.query,
+                        Math.max(0, offset - 20),
+                        lastSearch.game,
+                      )
+                    }
                   >
                     Previous
                   </button>
                   <span>Page {Math.floor(offset / 20) + 1}</span>
                   <button
                     disabled={disabled || !hasMore}
-                    onClick={() => void search(query, offset + 20)}
+                    onClick={() =>
+                      void search(
+                        lastSearch.query,
+                        offset + 20,
+                        lastSearch.game,
+                      )
+                    }
                   >
                     Next
                   </button>
@@ -595,11 +641,14 @@ export default function CollectionPanel({
               </div>
             )}
             <p className="collection-browser-help">
-              In the TCGplayer window, search normally and open a product.
-              Choose <b>Catalog → Look up this product in Personal Toolbox</b>{" "}
-              to bring it here. If the site blocks the in-app browser, use its
-              menu to open the page in your system browser, then paste the
-              product URL above.
+              Artwork: TCGplayer product images where available. Prices:
+              JustTCG, not TCGplayer lowest listings. Missing artwork does not
+              prevent adding or refreshing a card. In the TCGplayer window,
+              search normally and open a product. Choose{" "}
+              <b>Catalog → Look up this product in Personal Toolbox</b> to bring
+              it here. If the site blocks the in-app browser, use its menu to
+              open the page in your system browser, then paste the product URL
+              above.
             </p>
           </section>
         )}
@@ -677,8 +726,18 @@ export default function CollectionPanel({
                   <tr key={item.id}>
                     <td>
                       <div className="collection-owned-name">
-                        {item.imageData ? (
-                          <img src={item.imageData} alt={item.name} />
+                        {item.imageData ||
+                        (item.provider === "justtcg" && item.productId) ? (
+                          <CardArtwork
+                            localImage={item.imageData}
+                            productId={
+                              item.provider === "justtcg"
+                                ? item.productId
+                                : null
+                            }
+                            name={item.name}
+                            compact
+                          />
                         ) : (
                           <span className="collection-art">
                             {item.collectionType === "comics" ? (
@@ -1012,28 +1071,36 @@ function CatalogResultCard({
 }) {
   const [selected, setSelected] = useState("");
   const variant = card.variants.find((v) => v.id === selected);
+  const priced = card.variants.flatMap((v) =>
+    v.valueCents === null ? [] : [v.valueCents],
+  );
+  const minimum = priced.length ? Math.min(...priced) : null;
   return (
     <article className="catalog-card">
-      <div className="catalog-card-art">
-        <Layers size={33} />
-        <span>{card.game}</span>
-      </div>
+      <CardArtwork productId={card.productId} name={card.name} />
       <div className="catalog-card-heading">
-        <h3>{card.name}</h3>
+        <h3 title={card.name}>{card.name}</h3>
         <p>
           {card.setName}
           {card.number ? " · #" + card.number : ""}
         </p>
       </div>
       <label>
-        Printing / condition / language
+        Choose variant
         <select
           aria-label={"Variant for " + card.name}
+          title={
+            variant
+              ? [variant.printing, variant.condition, variant.language].join(
+                  " · ",
+                )
+              : "Choose the printing, condition, and language"
+          }
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
           disabled={disabled}
         >
-          <option value="">Choose a specific variant…</option>
+          <option value="">Select variant…</option>
           {card.variants.map((v) => (
             <option key={v.id} value={v.id}>
               {[v.printing, v.condition, v.language].join(" · ")} —{" "}
@@ -1048,10 +1115,12 @@ function CatalogResultCard({
             ? variant.valueCents === null
               ? "Unavailable"
               : money(variant.valueCents)
-            : "Select variant"}
+            : minimum === null
+              ? "Unavailable"
+              : "From " + money(minimum)}
         </strong>
         <span>
-          {variant ? "JustTCG · per item" : "No default condition is assumed"}
+          {variant ? "JustTCG · per item" : "Across available variants"}
         </span>
       </div>
       <div className="catalog-card-actions">
@@ -1224,7 +1293,10 @@ function AddCatalogItem({
         void onSave(Number(form.get("quantity")), cents);
       }}
     >
-      <h3 className="collection-selected-name">{card.name}</h3>
+      <div className="collection-selected-card">
+        <CardArtwork productId={card.productId} name={card.name} compact />
+        <h3 className="collection-selected-name">{card.name}</h3>
+      </div>
       <p className="collection-form-note">
         {card.setName} · {variant.printing} · {variant.condition} ·{" "}
         {variant.language}

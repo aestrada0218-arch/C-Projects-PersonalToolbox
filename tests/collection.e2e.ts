@@ -2,6 +2,154 @@ import { test, expect, _electron as electron } from "@playwright/test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+test("illustrated card search: full-title notice, correct product artwork, failed-image fallback and artwork retained on add", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "toolbox-artwork-ui-"));
+  const preload = join(dir, "artwork-fixture.cjs");
+  const image = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAwCAIAAAD/zu84AAAAMklEQVR4nO3NMQEAMAjAsDFx2MALyjEBXyqgiax+l/3TOwAAAAAAAAAAAAAAAAAAYLkBb14Bhw8dBlAAAAAASUVORK5CYII=",
+    "base64",
+  );
+  writeFileSync(
+    preload,
+    `const {contextBridge}=require('electron');let items=[];let requests=[];
+const names=['Mew - B/RGB','Mew - R/RGB','Mew - G/RGB','Mew ex - 066/128','Mew - 158/128','Mew','Mew ex - 152/128','Mew VMAX'];
+const settings=()=>({connected:true,supported:true,games:[{id:'pokemon',name:'Pokemon'}],cooldownUntil:0,dailyRemaining:90,monthlyRemaining:900});
+const state=()=>({items,settings:settings(),busy:false,progress:''});
+const cards=names.map((name,i)=>({id:'card-'+i,name,game:'Pokemon',setName:'Example Celebration',number:String(i+1),productId:String(20000+i),checkedAt:new Date().toISOString(),variants:[{id:'v-'+i,selectionId:'s-'+i,condition:'Near Mint',printing:'Holofoil',language:'English',valueCents:1200+i,lastKnownCents:null,observedAt:new Date().toISOString(),state:'current'}]}));
+contextBridge.exposeInMainWorld('toolbox',{
+snapshot:async()=>({orders:[],collection:[],tasks:[]}),collectionState:async()=>state(),collectionBrowserState:async()=>({open:false,productId:null,url:null}),onTcgProduct:()=>()=>{},
+searchCatalog:async(input)=>{requests.push(input);return {ok:true,cards,hasMore:input.offset===0,searchQuery:'Mew',settings:settings()}},catalogFixtureRequests:async()=>requests,
+addCatalogItem:async({selectionId,quantity,purchaseCents})=>{const card=cards.find(c=>c.variants[0].selectionId===selectionId);const v=card.variants[0];items.push({id:'item-1',name:card.name,category:card.game,collectionType:'cards',quantity,purchaseCents,valueCents:v.valueCents,lastKnownCents:v.valueCents,provider:'justtcg',cardId:card.id,variantId:v.id,productId:card.productId,condition:v.condition,printing:v.printing,language:v.language,setName:card.setName,referenceUrl:null,imageData:null,state:'current',observedAt:v.observedAt,checkedAt:card.checkedAt,error:null});return {ok:true,state:state()}}
+});`,
+  );
+  const app = await electron.launch({ args: [".", `--user-data-dir=${dir}`] });
+  try {
+    const fetched: string[] = [];
+    await app
+      .context()
+      .route("https://tcgplayer-cdn.tcgplayer.com/**", (route) => {
+        fetched.push(route.request().url());
+        expect(route.request().headers()["x-api-key"]).toBeUndefined();
+        expect(route.request().headers()["referer"]).toBeUndefined();
+        if (route.request().url().includes("20007_"))
+          return route.fulfill({ status: 404, body: "Missing image" });
+        return route.fulfill({ contentType: "image/png", body: image });
+      });
+    await app.firstWindow();
+    const next = app.waitForEvent("window");
+    await app.evaluate(
+      async ({ BrowserWindow }, { preload, file }) => {
+        const fixture = new BrowserWindow({
+          width: 1440,
+          height: 1000,
+          webPreferences: {
+            preload,
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true,
+          },
+        });
+        await fixture.loadFile(file);
+      },
+      { preload, file: join(process.cwd(), "dist/index.html") },
+    );
+    const page = await next;
+    await page.getByRole("button", { name: "Collection", exact: true }).click();
+    await page.getByRole("tab", { name: /TCGplayer/ }).click();
+    const title = "Mew - B/RGB - ME: 30th Celebration (30C)";
+    await page.getByLabel("Search card catalog").fill(title);
+    await page.getByLabel("Card game", { exact: true }).selectOption("pokemon");
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+    await expect(page.locator(".catalog-card")).toHaveCount(8);
+    await expect(page.locator(".catalog-results-heading")).toContainText(
+      "for “Mew”",
+    );
+    await expect(page.locator(".catalog-title-hint")).toContainText(
+      "full product title",
+    );
+    const first = page.locator(".catalog-card").first();
+    const art = first.getByRole("img", { name: "Mew - B/RGB", exact: true });
+    await art.scrollIntoViewIfNeeded();
+    await expect(first.locator(".card-artwork")).toHaveAttribute(
+      "data-status",
+      "ready",
+    );
+    await expect(art).toHaveAttribute(
+      "src",
+      "https://tcgplayer-cdn.tcgplayer.com/product/20000_in_400x400.jpg",
+    );
+    expect(
+      await art.evaluate((img: HTMLImageElement) => img.naturalWidth),
+    ).toBe(32);
+    await expect(first.locator(".catalog-card-price")).toContainText(
+      "From $12.00",
+    );
+    const last = page.locator(".catalog-card").last();
+    await last.scrollIntoViewIfNeeded();
+    await expect(last.getByRole("status")).toHaveAccessibleName(
+      "Image unavailable for Mew VMAX",
+    );
+    await last
+      .getByLabel("Variant for Mew VMAX", { exact: true })
+      .selectOption("v-7");
+    await expect(
+      last.getByRole("button", { name: "Add to collection", exact: true }),
+    ).toBeEnabled();
+    // Editing the form does not change the result set used for pagination.
+    await page.getByLabel("Search card catalog").fill("Another query");
+    await page.getByLabel("Card game", { exact: true }).selectOption("");
+    await page
+      .locator(".collection-catalog")
+      .getByRole("button", { name: "Next", exact: true })
+      .click();
+    expect(
+      await page.evaluate(async () =>
+        (window.toolbox as any).catalogFixtureRequests(),
+      ),
+    ).toEqual([
+      { query: title, game: "pokemon", offset: 0 },
+      { query: title, game: "pokemon", offset: 20 },
+    ]);
+    await first
+      .getByLabel("Variant for Mew - B/RGB", { exact: true })
+      .selectOption("v-0");
+    await first
+      .getByRole("button", { name: "Add to collection", exact: true })
+      .click();
+    await expect(
+      page
+        .getByRole("dialog")
+        .getByRole("img", { name: "Mew - B/RGB", exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("dialog")
+      .getByLabel("Unit purchase price ($)", { exact: true })
+      .fill("5.00");
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Add to collection", exact: true })
+      .click();
+    const owned = page
+      .locator(".collection-inventory tbody")
+      .getByRole("img", { name: "Mew - B/RGB", exact: true });
+    await owned.scrollIntoViewIfNeeded();
+    await expect(owned).toHaveAttribute(
+      "src",
+      "https://tcgplayer-cdn.tcgplayer.com/product/20000_in_400x400.jpg",
+    );
+    await expect(
+      page.locator(".collection-inventory .card-artwork"),
+    ).toHaveAttribute("data-status", "ready");
+    expect(fetched.length).toBeGreaterThan(0);
+    await page.screenshot({
+      path: "work/card-image-gallery.png",
+      fullPage: true,
+    });
+  } finally {
+    await app.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 test("real collection IPC: manual comics, local photo, editing, value history and restart persistence", async () => {
   const dir = mkdtempSync(join(tmpdir(), "toolbox-comics-ui-"));
   const photo = join(dir, "photo.png");
@@ -238,6 +386,11 @@ test("catalog UI: key validation, variant choice, add, manual quote refresh, exp
   );
   const app = await electron.launch({ args: [".", `--user-data-dir=${dir}`] });
   try {
+    await app
+      .context()
+      .route("https://tcgplayer-cdn.tcgplayer.com/**", (route) =>
+        route.fulfill({ status: 404, body: "Missing fixture artwork" }),
+      );
     await app.firstWindow();
     const next = app.waitForEvent("window");
     await app.evaluate(
