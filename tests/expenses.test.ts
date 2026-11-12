@@ -1,3 +1,4 @@
+import { makeCollectionV4 } from "./legacy-collection";
 import { describe, it, expect } from "vitest";
 import { Store } from "../electron/database";
 import { occurrenceDate } from "../electron/expenses/model";
@@ -272,6 +273,7 @@ it("migrates v0.2.1 data without losing connected inbox settings or orders", asy
       locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm"),
     });
     const v3 = new SQL.Database(readFileSync(file));
+    makeCollectionV4(v3);
     v3.run(
       "DROP TABLE expenses; DROP TABLE expense_schedules; DELETE FROM migrations WHERE version=4",
     );

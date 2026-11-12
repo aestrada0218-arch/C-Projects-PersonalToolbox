@@ -1,3 +1,8 @@
+import { net } from "electron";
+import { CollectionService, type PricingSecret } from "./collection/service";
+import { JustTcgProvider } from "./collection/justtcg";
+import { TcgCatalogBrowser } from "./collection/browser";
+import { registerCollectionHandlers } from "./collection/ipc";
 import { app, BrowserWindow, ipcMain, dialog } from "electron";
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
@@ -7,6 +12,8 @@ import { WindowsCredentialVault } from "./inbox/credentials";
 import { GmailImapProvider } from "./inbox/gmail";
 import { registerExpenseHandlers } from "./expenses/ipc";
 let stopExpenseTimer: (() => void) | undefined;
+let collectionService: CollectionService;
+let tcgBrowser: TcgCatalogBrowser;
 let inbox: InboxService;
 let store: Store;
 let window: BrowserWindow;
@@ -28,6 +35,7 @@ function createWindow() {
       webSecurity: true,
     },
   });
+  window.on("closed", () => tcgBrowser?.close());
   window.webContents.session.setPermissionRequestHandler(
     (_contents, _permission, callback) => callback(false),
   );
@@ -63,6 +71,21 @@ else {
     .then(async () => {
       store = await Store.open(
         join(app.getPath("userData"), "personal-toolbox.sqlite"),
+      );
+      collectionService = new CollectionService(
+        store.collection,
+        new WindowsCredentialVault<PricingSecret>("PersonalToolbox/JustTCG/v1"),
+        new JustTcgProvider(store.collection, (url, init) =>
+          net.fetch(url instanceof URL ? url.toString() : url, init),
+        ),
+      );
+      tcgBrowser = new TcgCatalogBrowser(() => window);
+      registerCollectionHandlers(
+        collectionService,
+        store.collection,
+        tcgBrowser,
+        () => window,
+        handle,
       );
       inbox = new InboxService(
         store,
@@ -131,6 +154,8 @@ else {
     if (process.platform !== "darwin") app.quit();
   });
   app.on("before-quit", () => {
+    collectionService?.stop();
+    tcgBrowser?.close();
     stopExpenseTimer?.();
     inbox?.stop();
     store?.close();

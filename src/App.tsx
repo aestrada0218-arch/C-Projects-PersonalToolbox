@@ -1,3 +1,4 @@
+import CollectionPanel from "./CollectionPanel";
 import ExpensesPanel from "./ExpensesPanel";
 import InboxPanel from "./InboxPanel";
 import { useEffect, useMemo, useState } from "react";
@@ -73,6 +74,24 @@ const plans: Record<string, string> = {
 export default function App() {
   const [data, setData] = useState<Snapshot>(empty);
   const [page, setPage] = useState("Analytics");
+  const [productRequest, setProductRequest] = useState<{
+    id: string;
+    nonce: number;
+  } | null>(null);
+  useEffect(
+    () =>
+      window.toolbox?.onTcgProduct?.((id) => {
+        setProductRequest({ id, nonce: Date.now() });
+        setPage("Collection");
+      }),
+    [],
+  );
+  const refreshCollectionSnapshot = () => {
+    void window.toolbox
+      ?.snapshot()
+      .then(setData)
+      .catch(() => setError("Could not update the dashboard snapshot."));
+  };
   const [range, setRange] = useState("90");
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState(false);
@@ -123,7 +142,9 @@ export default function App() {
     .filter((o) => o.status !== "Cancelled")
     .reduce((s, o) => s + o.total, 0);
   const value = data.collection.reduce((s, i) => s + i.market * i.quantity, 0);
-  const cost = data.collection.reduce((s, i) => s + i.purchase * i.quantity, 0);
+  const cost = data.collection
+    .filter((i) => i.marketKnown !== 0)
+    .reduce((s, i) => s + i.purchase * i.quantity, 0);
   const shipped = orders.filter((o) => o.status === "In transit").length;
   const delivered = orders.filter((o) => o.status === "Delivered").length;
   const chart = useMemo(
@@ -234,7 +255,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.3.0</span>
+            <span>v0.4.0</span>
           </div>
         </div>
       </aside>
@@ -252,7 +273,7 @@ export default function App() {
           </div>
         </header>
         <main>
-          {page !== "Expenses" && (
+          {!["Expenses", "Collection"].includes(page) && (
             <>
               {" "}
               <div className="title-row">
@@ -326,7 +347,9 @@ export default function App() {
                         label: "Collection value",
                         amount: money(value),
                         icon: Layers,
-                        detail: `${(((value - cost) / Math.max(cost, 1)) * 100).toFixed(1)}% unrealized return`,
+                        detail: data.collection.some((i) => i.marketKnown === 0)
+                          ? `${data.collection.filter((i) => i.marketKnown === 0).length} entries awaiting a current value`
+                          : `${(((value - cost) / Math.max(cost, 1)) * 100).toFixed(1)}% unrealized return`,
                         accent: true,
                       },
                       {
@@ -661,41 +684,10 @@ export default function App() {
                 </section>
               )}
               {page === "Collection" && (
-                <section className="panel">
-                  <div className="panel-heading">
-                    <h2>Collection inventory</h2>
-                    <span className="gold">{money(value)} market value</span>
-                  </div>
-                  <div className="table-scroll">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>ITEM</th>
-                          <th>QUANTITY</th>
-                          <th>UNIT COST</th>
-                          <th>UNIT VALUE</th>
-                          <th>UNREALIZED PROFIT</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.collection.map((i) => (
-                          <tr key={i.id}>
-                            <td>
-                              {i.name}
-                              <small>{i.category}</small>
-                            </td>
-                            <td>{i.quantity}</td>
-                            <td>{money(i.purchase)}</td>
-                            <td>{money(i.market)}</td>
-                            <td className="positive">
-                              {money((i.market - i.purchase) * i.quantity)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
+                <CollectionPanel
+                  onChanged={refreshCollectionSnapshot}
+                  productRequest={productRequest}
+                />
               )}
               {page === "Expenses" && <ExpensesPanel />}
               {page === "Inbox" && (
@@ -741,7 +733,7 @@ export default function App() {
                 ? "Local database connected"
                 : "Desktop connection required"}
             </span>
-            <span>v0.3 · Sample data included.</span>
+            <span>v0.4 · Sample data included.</span>
           </footer>
         </main>
       </div>

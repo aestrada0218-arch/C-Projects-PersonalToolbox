@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 export type MailSecret = { email: string; appPassword: string };
-export interface CredentialVault {
-  read(): Promise<MailSecret | null>;
-  write(secret: MailSecret): Promise<void>;
+export interface CredentialVault<T = MailSecret> {
+  read(): Promise<T | null>;
+  write(secret: T): Promise<void>;
   remove(): Promise<void>;
 }
 // Static source only: credential values travel over stdin/stdout pipes, never command arguments.
@@ -56,15 +56,17 @@ try {
  }
 } catch {exit 1}
 `;
-export class WindowsCredentialVault implements CredentialVault {
+export class WindowsCredentialVault<
+  T = MailSecret,
+> implements CredentialVault<T> {
   constructor(private target = "PersonalToolbox/GmailIMAP/v1") {
     if (!/^PersonalToolbox\/[A-Za-z0-9/-]{1,100}$/.test(target))
       throw new Error("Invalid credential target");
   }
   private async call(
     action: "read" | "write" | "remove",
-    secret?: MailSecret,
-  ): Promise<MailSecret | null> {
+    secret?: T,
+  ): Promise<T | null> {
     if (process.platform !== "win32") throw new Error("CREDENTIAL_UNAVAILABLE");
     const executable = join(
       process.env.SystemRoot || "C:\\Windows",
@@ -129,7 +131,7 @@ export class WindowsCredentialVault implements CredentialVault {
   read() {
     return this.call("read");
   }
-  async write(secret: MailSecret) {
+  async write(secret: T) {
     await this.call("write", secret);
   }
   async remove() {

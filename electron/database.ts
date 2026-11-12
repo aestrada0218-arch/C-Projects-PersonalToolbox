@@ -1,3 +1,5 @@
+import { CollectionRepository } from "./collection/store";
+import { collectionMigration } from "./collection/model";
 import { ExpenseRepository } from "./expenses/store";
 import { expenseMigration } from "./expenses/model";
 import initSqlJs, { Database } from "sql.js";
@@ -36,6 +38,10 @@ export const orderSchema = z
   })
   .strict();
 export class Store {
+  readonly collection = new CollectionRepository(
+    () => this.db,
+    (fn) => this.mutate(fn),
+  );
   readonly expenses = new ExpenseRepository(
     () => this.db,
     (fn) => this.mutate(fn),
@@ -65,7 +71,7 @@ export class Store {
     );
     const version =
       this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
-    if (Number(version) > 4) throw new Error("Unsupported database version");
+    if (Number(version) > 5) throw new Error("Unsupported database version");
     if (Number(version) < 1) {
       this.db.run(
         `BEGIN; CREATE TABLE orders(id TEXT PRIMARY KEY,name TEXT NOT NULL,store TEXT NOT NULL,category TEXT NOT NULL,total REAL NOT NULL CHECK(total>=0),status TEXT NOT NULL CHECK(status IN ('Delivered','In transit','Processing','Cancelled')),date TEXT NOT NULL); CREATE TABLE collection(id TEXT PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),purchase REAL NOT NULL,market REAL NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO migrations VALUES(1);`,
@@ -120,6 +126,23 @@ export class Store {
         "BEGIN;" +
           expenseMigration +
           " INSERT INTO migrations VALUES(4); COMMIT;",
+      );
+      this.persist();
+    }
+    if (Number(version) < 5) {
+      if (
+        this.path &&
+        Number(version) > 0 &&
+        !existsSync(this.path + ".pre-collection-v4.bak")
+      )
+        writeFileSync(this.path + ".pre-collection-v4.bak", this.db.export(), {
+          flag: "wx",
+          mode: 0o600,
+        });
+      this.db.run(
+        "BEGIN;" +
+          collectionMigration +
+          " INSERT INTO migrations VALUES(5); COMMIT;",
       );
       this.persist();
     }
@@ -183,7 +206,10 @@ export class Store {
       orders: this.rows("orders").sort((a, b) =>
         String(b.date).localeCompare(String(a.date)),
       ),
-      collection: this.rows("collection"),
+      collection: this.rows("collection").map((item) => ({
+        ...item,
+        market: item.marketKnown ? item.market : 0,
+      })),
       tasks: this.rows("tasks"),
     } as Snapshot;
   }

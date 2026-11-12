@@ -1,3 +1,4 @@
+import { makeCollectionV4 } from "./legacy-collection";
 import { it, expect } from "vitest";
 import initSqlJs from "sql.js";
 import { Store } from "../electron/database";
@@ -15,6 +16,7 @@ it("migrates a Stage 1 database without losing orders and never persists app pas
       locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm"),
     });
     const v1 = new SQL.Database(readFileSync(path));
+    makeCollectionV4(v1);
     v1.run(
       "DROP TABLE expenses; DROP TABLE expense_schedules; DROP TABLE inbox_updates; DROP TABLE shipments; DROP TABLE inbox_account; DELETE FROM migrations WHERE version>=2",
     );
@@ -71,6 +73,7 @@ it("upgrades a connected v0.2 inbox while preserving account settings and tracke
       locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm"),
     });
     const v2 = new SQL.Database(readFileSync(path));
+    makeCollectionV4(v2);
     v2.run(
       "DROP TABLE expenses; DROP TABLE expense_schedules; DROP TABLE inbox_updates; DELETE FROM migrations WHERE version>=3",
     );

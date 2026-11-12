@@ -1,4 +1,14 @@
 import type {
+  CollectionState,
+  CollectionResult,
+  CatalogResult,
+  CatalogSearch,
+  ManualCollectible,
+  LinkedCollectible,
+  QuoteObservation,
+  CollectionBrowserState,
+} from "./collection-types";
+import type {
   ExpenseInput,
   ExpenseState,
   ExpenseResult,
@@ -23,6 +33,7 @@ export type Item = {
   quantity: number;
   purchase: number;
   market: number;
+  marketKnown?: number;
 };
 export type Snapshot = {
   orders: Order[];
@@ -32,6 +43,24 @@ export type Snapshot = {
 export type NewOrder = Omit<Order, "id">;
 export interface ToolboxAPI {
   snapshot(): Promise<Snapshot>;
+  collectionState(): Promise<CollectionState>;
+  connectPricing(key: string): Promise<CollectionResult>;
+  disconnectPricing(): Promise<CollectionResult>;
+  searchCatalog(input: CatalogSearch): Promise<CatalogResult>;
+  addCatalogItem(input: LinkedCollectible): Promise<CollectionResult>;
+  addManualCollectible(input: ManualCollectible): Promise<CollectionResult>;
+  editCollectible(input: {
+    id: string;
+    item: ManualCollectible;
+  }): Promise<CollectionResult>;
+  deleteCollectible(id: string): Promise<CollectionResult>;
+  refreshCollection(id?: string): Promise<CollectionResult>;
+  collectionHistory(id: string): Promise<QuoteObservation[]>;
+  browseTcg(): Promise<CollectionBrowserState>;
+  collectionBrowserState(): Promise<CollectionBrowserState>;
+  openCollectionProvider(url: string): Promise<boolean>;
+  chooseCollectionImage(): Promise<{ data: string | null; error?: string }>;
+  onTcgProduct(callback: (id: string) => void): () => void;
   expenseState(): Promise<ExpenseState>;
   addExpense(input: ExpenseInput): Promise<ExpenseResult>;
   editExpense(input: {
