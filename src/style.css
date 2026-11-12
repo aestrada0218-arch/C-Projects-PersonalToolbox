@@ -865,3 +865,197 @@ footer > span:first-child {
     width: 300px;
   }
 }
+.inbox-module {
+  display: grid;
+  gap: 20px;
+}
+.inbox-intro {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  padding: 23px;
+}
+.inbox-intro h2 {
+  font-size: 19px;
+  font-weight: 550;
+  margin: 0 0 5px;
+}
+.inbox-intro > .local-pill {
+  margin-left: auto;
+}
+.gmail-icon {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  color: #d6b56b;
+  background: #d6b56b12;
+}
+.inbox-account {
+  padding-bottom: 22px;
+}
+.inbox-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 22px;
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #a4adba;
+  font-size: 11px;
+}
+.toggle input {
+  accent-color: #d6b56b;
+}
+.sync-summary {
+  display: flex;
+  gap: 25px;
+  padding: 0 22px;
+  color: #798492;
+  font-size: 10px;
+}
+.gmail-form {
+  padding: 24px 22px 0;
+}
+.gmail-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #b0b7c4;
+  font-size: 11px;
+  margin-bottom: 17px;
+}
+.gmail-form input {
+  background: #101319;
+  border: 1px solid #353c46;
+  padding: 11px;
+  border-radius: 6px;
+  color: #d6dce4;
+  min-width: 0;
+}
+.gmail-secret-note {
+  color: #7d8794;
+  font-size: 10px;
+  margin-left: 15px;
+}
+.inbox-help {
+  padding: 22px;
+  color: #a7b0bf;
+}
+.inbox-help h3 {
+  font-size: 13px;
+  margin: 0 0 12px;
+  font-weight: 550;
+}
+.inbox-help ol {
+  font-size: 11px;
+  line-height: 2;
+  list-style: decimal;
+  padding-left: 18px;
+  margin: 0 0 10px;
+}
+.inbox-help p {
+  margin-top: 12px;
+  max-width: 950px;
+}
+.inbox-help p svg {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 5px;
+  color: #98b49d;
+}
+.inbox-warning {
+  margin: 15px 22px 0;
+  color: #d6b56b;
+}
+.shipment-row {
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  padding: 20px 22px;
+  border-top: 1px solid #292e36;
+}
+.shipment-info {
+  min-width: 0;
+}
+.shipment-info > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.shipment-carrier {
+  font-size: 11px;
+  font-weight: 600;
+  color: #c2ac7f;
+}
+.shipment-info code {
+  font-size: 12px;
+  color: #cfd5de;
+}
+.shipment-info p {
+  margin-top: 9px;
+  overflow-wrap: anywhere;
+}
+.shipment-apply {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.shipment-apply select {
+  width: 200px;
+  text-overflow: ellipsis;
+}
+.inbox-module .empty > svg {
+  margin: 0 auto 15px;
+  color: #9b865f;
+}
+.inbox-module .empty h3 {
+  margin-bottom: 8px;
+}
+.inbox-module .empty p {
+  max-width: 600px;
+  margin: auto;
+}
+.disconnect-confirm {
+  margin: 0 22px;
+  padding: 17px;
+  border: 1px solid #754b48;
+  border-radius: 7px;
+}
+.disconnect-confirm button {
+  margin: 13px 20px 0 0;
+}
+.danger-button {
+  color: #e5a09a;
+}
+.inbox-module .alert,
+.inbox-module .notice {
+  margin: 0;
+}
+.inbox-module .table-bottom {
+  line-height: 1.6;
+}
+@media (max-width: 1250px) {
+  .shipment-row {
+    flex-direction: column;
+  }
+  .shipment-apply select {
+    width: 320px;
+  }
+  .inbox-intro > .local-pill {
+    display: none;
+  }
+}
+button:disabled,
+input:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

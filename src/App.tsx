@@ -1,3 +1,4 @@
+import InboxPanel from "./InboxPanel";
 import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
@@ -64,8 +65,7 @@ const plans: Record<string, string> = {
     "Organize proxy groups, test connectivity, and monitor health. Authentication will use Windows Credential Manager.",
   Profiles:
     "Manage account and shipping profiles with secure sensitive fields and validated CSV import.",
-  Inbox:
-    "Connect supported email providers using modular adapters and secure OAuth authentication.",
+
   Expenses: "Track shipping, taxes, marketplace fees, and realized profit.",
   Settings:
     "Configure preferences, notifications, database backups, and storage.",
@@ -218,7 +218,9 @@ export default function App() {
               <Icon size={18} />
               <span>{name}</span>
               {name === "Orders" && <small>{data.orders.length}</small>}
-              {name === "Analytics" && <span className="active-dot" />}
+              {name === "Analytics" && page === name && (
+                <span className="active-dot" />
+              )}
             </button>
           ))}
         </nav>
@@ -232,7 +234,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.1.0</span>
+            <span>v0.2.0</span>
           </div>
         </div>
       </aside>
@@ -690,6 +692,9 @@ export default function App() {
                   </div>
                 </section>
               )}
+              {page === "Inbox" && (
+                <InboxPanel orders={data.orders} onOrdersChanged={reload} />
+              )}
               {plans[page] && (
                 <section className="panel planned">
                   <span className="planned-icon">
@@ -730,7 +735,7 @@ export default function App() {
                 ? "Local database connected"
                 : "Desktop connection required"}
             </span>
-            <span>Stage 1 · Sample data included.</span>
+            <span>v0.2 · Sample data included.</span>
           </footer>
         </main>
       </div>

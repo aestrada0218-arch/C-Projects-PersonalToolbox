@@ -2,6 +2,10 @@ import { app, BrowserWindow, ipcMain, dialog } from "electron";
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
 import { Store } from "./database";
+import { InboxService } from "./inbox/service";
+import { WindowsCredentialVault } from "./inbox/credentials";
+import { GmailImapProvider } from "./inbox/gmail";
+let inbox: InboxService;
 let store: Store;
 let window: BrowserWindow;
 const dev = process.argv.includes("--dev") && !app.isPackaged;
@@ -58,6 +62,18 @@ else {
       store = await Store.open(
         join(app.getPath("userData"), "personal-toolbox.sqlite"),
       );
+      inbox = new InboxService(
+        store,
+        new WindowsCredentialVault(),
+        new GmailImapProvider(),
+      );
+      handle("toolbox:inbox-state", () => inbox.state());
+      handle("toolbox:connect-gmail", (input) => inbox.connect(input));
+      handle("toolbox:refresh-inbox", () => inbox.refresh());
+      handle("toolbox:disconnect-gmail", () => inbox.disconnect());
+      handle("toolbox:inbox-auto", (value) => inbox.setAuto(value));
+      handle("toolbox:link-shipment", (input) => inbox.link(input));
+      inbox.start();
       handle("toolbox:snapshot", () => store.snapshot());
       handle("toolbox:add-order", (input) => store.addOrder(input));
       handle("toolbox:export-orders", async () => {
@@ -105,5 +121,8 @@ else {
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
   });
-  app.on("before-quit", () => store?.close());
+  app.on("before-quit", () => {
+    inbox?.stop();
+    store?.close();
+  });
 }

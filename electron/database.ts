@@ -9,6 +9,8 @@ import {
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import type { InboxAccount, Shipment, ShipmentEvent } from "../src/inbox-types";
+import type { ScanResult } from "./inbox/gmail";
 import type { Snapshot, NewOrder } from "../src/types";
 export const orderSchema = z
   .object({
@@ -52,13 +54,30 @@ export class Store {
     );
     const version =
       this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
-    if (Number(version) > 1) throw new Error("Unsupported database version");
+    if (Number(version) > 2) throw new Error("Unsupported database version");
     if (Number(version) < 1) {
       this.db.run(
         `BEGIN; CREATE TABLE orders(id TEXT PRIMARY KEY,name TEXT NOT NULL,store TEXT NOT NULL,category TEXT NOT NULL,total REAL NOT NULL CHECK(total>=0),status TEXT NOT NULL CHECK(status IN ('Delivered','In transit','Processing','Cancelled')),date TEXT NOT NULL); CREATE TABLE collection(id TEXT PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),purchase REAL NOT NULL,market REAL NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO migrations VALUES(1);`,
       );
       this.seed();
       this.db.run("COMMIT");
+      this.persist();
+    }
+    if (Number(version) < 2) {
+      if (
+        Number(version) === 1 &&
+        this.path &&
+        !existsSync(this.path + ".pre-inbox-v1.bak")
+      ) {
+        writeFileSync(this.path + ".pre-inbox-v1.bak", this.db.export(), {
+          flag: "wx",
+          mode: 0o600,
+        });
+      }
+      this.db.run(`BEGIN;
+        CREATE TABLE inbox_account(id INTEGER PRIMARY KEY CHECK(id=1),email TEXT NOT NULL,auto INTEGER NOT NULL DEFAULT 0 CHECK(auto IN (0,1)),lastSync TEXT,error TEXT,scanned INTEGER NOT NULL DEFAULT 0,skipped INTEGER NOT NULL DEFAULT 0,limited INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE shipments(id TEXT PRIMARY KEY,tracking TEXT NOT NULL UNIQUE,carrier TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('In transit','Out for delivery','Delivered')),received TEXT NOT NULL,subject TEXT NOT NULL,orderId TEXT REFERENCES orders(id) ON DELETE SET NULL);
+        INSERT INTO migrations VALUES(2); COMMIT;`);
       this.persist();
     }
   }
@@ -144,9 +163,115 @@ export class Store {
     } catch (e) {
       this.db.close();
       this.db = this.restore(before);
+      this.db.run("PRAGMA foreign_keys=ON");
       throw e;
     }
     return this.snapshot();
+  }
+  private mutate<T>(fn: () => T): T {
+    const before = this.db.export();
+    this.db.run("BEGIN");
+    try {
+      const result = fn();
+      this.db.run("COMMIT");
+      this.persist();
+      return result;
+    } catch (error) {
+      this.db.close();
+      this.db = this.restore(before);
+      this.db.run("PRAGMA foreign_keys=ON");
+      throw error;
+    }
+  }
+  inboxAccount(): InboxAccount | null {
+    const row = this.rows("inbox_account")[0];
+    if (!row) return null;
+    return {
+      ...row,
+      auto: Boolean(row.auto),
+      limited: Boolean(row.limited),
+    } as unknown as InboxAccount;
+  }
+  shipments(): Shipment[] {
+    return this.rows("shipments").sort((a, b) =>
+      String(b.received).localeCompare(String(a.received)),
+    ) as unknown as Shipment[];
+  }
+  connectInbox(email: string, scan: ScanResult) {
+    this.mutate(() => {
+      if (this.inboxAccount()?.email !== email)
+        this.db.run("DELETE FROM shipments");
+      this.db.run(
+        "INSERT OR REPLACE INTO inbox_account(id,email,auto) VALUES(1,?,0)",
+        [email],
+      );
+      this.ingest(scan);
+    });
+  }
+  recordInboxScan(scan: ScanResult) {
+    this.mutate(() => this.ingest(scan));
+  }
+  private ingest(scan: ScanResult) {
+    for (const event of scan.events) {
+      this.db.run(
+        `INSERT INTO shipments(id,tracking,carrier,status,received,subject) VALUES(?,?,?,?,?,?) ON CONFLICT(tracking) DO UPDATE SET carrier=excluded.carrier,status=excluded.status,received=excluded.received,subject=excluded.subject WHERE excluded.received>shipments.received`,
+        [
+          randomUUID(),
+          event.tracking,
+          event.carrier,
+          event.status,
+          event.received,
+          event.subject,
+        ],
+      );
+    }
+    this.db.run(
+      "UPDATE inbox_account SET lastSync=?,error=NULL,scanned=?,skipped=?,limited=? WHERE id=1",
+      [
+        new Date().toISOString(),
+        scan.scanned,
+        scan.skipped,
+        Number(scan.limited),
+      ],
+    );
+  }
+  setInboxError(message: string) {
+    this.mutate(() =>
+      this.db.run("UPDATE inbox_account SET error=? WHERE id=1", [message]),
+    );
+  }
+  setInboxAuto(value: boolean) {
+    this.mutate(() =>
+      this.db.run("UPDATE inbox_account SET auto=? WHERE id=1", [
+        Number(value),
+      ]),
+    );
+  }
+  disconnectInbox() {
+    this.mutate(() =>
+      this.db.run("DELETE FROM shipments; DELETE FROM inbox_account"),
+    );
+  }
+  applyShipment(input: unknown) {
+    const { shipmentId, orderId } = z
+      .object({ shipmentId: z.string().uuid(), orderId: z.string().uuid() })
+      .strict()
+      .parse(input);
+    this.mutate(() => {
+      const shipment = this.shipments().find((s) => s.id === shipmentId);
+      const order = this.snapshot().orders.find((o) => o.id === orderId);
+      if (!shipment || !order || order.status === "Cancelled")
+        throw new Error("Invalid link");
+      const status =
+        shipment.status === "Delivered" ? "Delivered" : "In transit";
+      if (order.status === "Delivered" && status !== "Delivered")
+        throw new Error("Cannot downgrade a delivered order");
+      this.db.run("UPDATE shipments SET orderId=? WHERE id=?", [
+        orderId,
+        shipmentId,
+      ]);
+      this.db.run("UPDATE orders SET status=? WHERE id=?", [status, orderId]);
+    });
   }
   private persist() {
     if (!this.path) return;

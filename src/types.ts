@@ -1,3 +1,4 @@
+import type { InboxState, InboxResult, GmailConnection } from "./inbox-types";
 export type Order = {
   id: string;
   name: string;
@@ -23,6 +24,15 @@ export type Snapshot = {
 export type NewOrder = Omit<Order, "id">;
 export interface ToolboxAPI {
   snapshot(): Promise<Snapshot>;
+  inboxState(): Promise<InboxState>;
+  connectGmail(input: GmailConnection): Promise<InboxResult>;
+  refreshInbox(): Promise<InboxResult>;
+  disconnectGmail(): Promise<InboxResult>;
+  setInboxAuto(enabled: boolean): Promise<InboxResult>;
+  linkShipment(input: {
+    shipmentId: string;
+    orderId: string;
+  }): Promise<InboxResult>;
   addOrder(order: NewOrder): Promise<Snapshot>;
   exportOrders(): Promise<boolean>;
 }
