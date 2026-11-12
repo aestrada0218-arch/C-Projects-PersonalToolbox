@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { extractEmailUpdate } from "./email-update";
+import type { EmailUpdateEvent } from "../../src/inbox-types";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import type { ShipmentEvent } from "../../src/inbox-types";
@@ -5,6 +8,7 @@ import type { MailSecret } from "./credentials";
 import { extractShipments } from "./extract";
 export type ScanResult = {
   events: ShipmentEvent[];
+  updates?: EmailUpdateEvent[];
   scanned: number;
   skipped: number;
   limited: boolean;
@@ -54,6 +58,10 @@ export class GmailImapProvider implements EmailProvider {
               { subject: "dispatch" },
               { subject: "on its way" },
               { subject: "on the way" },
+              { subject: "confirmed" },
+              { subject: "confirmation" },
+              { subject: "order received" },
+              { body: "Forwarded message" },
             ],
           },
           { uid: true },
@@ -61,6 +69,7 @@ export class GmailImapProvider implements EmailProvider {
         const ids = (found || []).sort((a, b) => b - a).slice(0, 100);
         const result: ScanResult = {
           events: [],
+          updates: [],
           scanned: 0,
           skipped: 0,
           limited: (found || []).length > 100,
@@ -97,13 +106,27 @@ export class GmailImapProvider implements EmailProvider {
               msg.internalDate instanceof Date
                 ? msg.internalDate.toISOString()
                 : new Date(msg.internalDate || Date.now()).toISOString();
-            result.events.push(
-              ...extractShipments(
-                mail.subject || "",
-                mail.text || "",
-                received,
-              ),
+            const subject = mail.subject || "";
+            const text = mail.text || "";
+            const externalId = createHash("sha256")
+              .update(
+                mail.messageId ||
+                  `${client.mailbox && client.mailbox.uidValidity}:${uid}`,
+              )
+              .digest("hex");
+            const update = extractEmailUpdate(
+              subject,
+              text,
+              received,
+              externalId,
             );
+            const events = extractShipments(
+              update?.subject || subject,
+              text,
+              received,
+            );
+            result.events.push(...events);
+            if (!events.length && update) result.updates!.push(update);
           } catch {
             result.skipped++;
           }

@@ -72,6 +72,7 @@ else {
       handle("toolbox:refresh-inbox", () => inbox.refresh());
       handle("toolbox:disconnect-gmail", () => inbox.disconnect());
       handle("toolbox:inbox-auto", (value) => inbox.setAuto(value));
+      handle("toolbox:link-email-update", (input) => inbox.linkUpdate(input));
       handle("toolbox:link-shipment", (input) => inbox.link(input));
       inbox.start();
       handle("toolbox:snapshot", () => store.snapshot());

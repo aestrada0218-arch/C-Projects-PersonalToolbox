@@ -16,7 +16,7 @@ it("migrates a Stage 1 database without losing orders and never persists app pas
     });
     const v1 = new SQL.Database(readFileSync(path));
     v1.run(
-      "DROP TABLE shipments; DROP TABLE inbox_account; DELETE FROM migrations WHERE version=2",
+      "DROP TABLE inbox_updates; DROP TABLE shipments; DROP TABLE inbox_account; DELETE FROM migrations WHERE version>=2",
     );
     writeFileSync(path, v1.export());
     v1.close();
@@ -41,6 +41,47 @@ it("migrates a Stage 1 database without losing orders and never persists app pas
     expect(columns).not.toContain("appPassword");
     expect(columns).not.toContain("password");
     disk.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+it("upgrades a connected v0.2 inbox while preserving account settings and tracked shipments", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "toolbox-v2-"));
+  const path = join(dir, "db.sqlite");
+  try {
+    let db = await Store.open(path);
+    db.connectInbox("test@gmail.com", {
+      events: [
+        {
+          tracking: "1Z999AA10123456784",
+          carrier: "UPS",
+          status: "In transit",
+          subject: "Your package shipped",
+          received: "2026-11-12T12:00:00Z",
+        },
+      ],
+      scanned: 1,
+      skipped: 0,
+      limited: false,
+    });
+    db.setInboxAuto(true);
+    const id = db.shipments()[0].id;
+    db.close();
+    const SQL = await initSqlJs({
+      locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm"),
+    });
+    const v2 = new SQL.Database(readFileSync(path));
+    v2.run("DROP TABLE inbox_updates; DELETE FROM migrations WHERE version=3");
+    writeFileSync(path, v2.export());
+    v2.close();
+    db = await Store.open(path);
+    expect(db.inboxAccount()).toMatchObject({
+      email: "test@gmail.com",
+      auto: true,
+    });
+    expect(db.shipments()[0].id).toBe(id);
+    expect(db.emailUpdates()).toEqual([]);
+    db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

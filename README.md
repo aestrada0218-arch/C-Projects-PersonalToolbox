@@ -1,4 +1,4 @@
-# Personal Toolbox · v0.2
+# Personal Toolbox · v0.2.1
 
 A Windows desktop app built with Electron, React, TypeScript, Vite, Tailwind CSS, SQLite (sql.js), Recharts, and Playwright. Original dark-and-gold interface. Version 0.2 adds Gmail shipment monitoring to the Stage 1 dashboard.
 
@@ -31,7 +31,7 @@ To update an existing installation, close the app, download the latest source ZI
 3. In Personal Toolbox, open **Inbox**. Enter your Gmail address and the 16-letter app password. Spaces in the app password are accepted.
 4. Click **Connect Gmail securely**. The app tests authentication and scans matching shipping emails before saving the credential.
 5. Use **Refresh now**, or enable **Check every 10 minutes while app is open**. Auto-checking is off by default and resumes on app startup only if you enabled it. Closing the app stops checks.
-6. Review each detected shipment. Choose the correct order and click **Apply status** to link it and update the order. Later emails update the shipment inbox; applying each change to an order remains manual.
+6. Emails without a recognized tracking number appear in **Email updates without tracking**, including inline forwarded order confirmations and Amazon delivery notices. Review each email or detected shipment. Choose the correct order and click **Apply status** to link it and update the order. Later emails update the shipment inbox; applying each change to an order remains manual.
 
 The Windows credential is saved via the native `CredWriteW`, `CredReadW`, and `CredDeleteW` APIs, invoked by a hidden PowerShell process. Secrets travel through stdin/stdout pipes, never command arguments, SQLite, application logs, or renderer storage. The input is cleared on submission and the saved password is never returned to the renderer. Only Windows is supported for connection; other platforms display an unavailable message with no plaintext fallback.
 
@@ -40,13 +40,13 @@ The credential is a **Google app password**, which grants mailbox access. This a
 ## Shipment detection limits
 
 - Scans **INBOX**, not Spam, Trash, or archived-only mail. Gmail personal accounts normally have IMAP enabled; administrators must allow it for managed accounts.
-- Searches shipping-related English subjects from the **last 30 days**, scanning at most the **newest 100 matches** per check. The screen reports when the cap was reached.
+- Searches shipping/confirmation-related English subjects and inline-forwarded messages from the **last 30 days**, scanning at most the **newest 100 matches** per check. The screen reports when the cap was reached.
 - Skips messages larger than 1 MiB and bounds fetched message size. Scans have connection/socket timeouts and a two-minute deadline. A scan cannot overlap another inbox operation.
 - Recognizes UPS `1Z…`, supported USPS numeric formats, Amazon `TBA…`, and FedEx/DHL numbers with explicit carrier labels or supported official tracking URLs. Other carriers, number formats, languages, and subject templates may not match yet.
 - Status comes conservatively from the subject, with body text used for tracking extraction. Quoted body histories do not automatically mark a shipment delivered. These heuristics can still be wrong; review them before applying.
-- Stores one row per tracking number, updating it only from a newer received email. SQLite holds your email address, scan settings/counts, tracking number, carrier, subject, received date, inferred status, and optional linked order ID. Email bodies, attachments, remote images, links, and HTML are never displayed or retained.
+- Stores one row per tracking number, updating it only from a newer received email. Relevant messages without recognized tracking are kept separately, deduplicated by a hashed message identity, with inferred status and an order reference when available. No tracking number is invented. SQLite holds your email address, scan settings/counts, tracking number, carrier, subject, received date, inferred status, and optional linked order ID. Email bodies, attachments, remote images, links, and HTML are never displayed or retained.
 - Email-derived status is not a live carrier confirmation. Applying out-for-delivery maps the order to **In transit** because orders currently use a smaller status vocabulary. Cancelled orders and backward changes to delivered orders are rejected.
-- **Disconnect and clear inbox** removes the Credential Manager entry, account settings, and detected shipments. Existing orders and applied order statuses remain. To revoke the app password entirely, also delete it in your Google Account.
+- **Disconnect and clear inbox** removes the Credential Manager entry, account settings, detected shipments, and untracked email updates. Existing orders and applied order statuses remain. To revoke the app password entirely, also delete it in your Google Account.
 
 ## Other working modules
 
@@ -59,7 +59,7 @@ A new database receives 36 illustrative orders, six collection entries and three
 
 ## Storage, migrations, and security
 
-Electron `app.getPath('userData')/personal-toolbox.sqlite` is the database (normally `%APPDATA%/personal-toolbox/`). Close the app before copying or restoring it. Migration 1 creates the original schema and samples. Migration 2 adds the inbox tables and preserves existing records; an existing Stage 1 database receives a `.pre-inbox-v1.bak` snapshot before migration. Unknown future versions are rejected. Writes use transactions, bound SQL parameters, atomic replacement, and in-memory rollback on persistence failure. A single-instance lock prevents competing app writers.
+Electron `app.getPath('userData')/personal-toolbox.sqlite` is the database (normally `%APPDATA%/personal-toolbox/`). Close the app before copying or restoring it. Migration 1 creates the original schema and samples. Migration 2 adds the inbox tables and preserves existing records; migration 3 adds the untracked-email review table and preserves connected account settings/shipments, with a `.pre-inbox-v2.bak` snapshot before upgrading an existing database; an existing Stage 1 database receives a `.pre-inbox-v1.bak` snapshot before migration. Unknown future versions are rejected. Writes use transactions, bound SQL parameters, atomic replacement, and in-memory rollback on persistence failure. A single-instance lock prevents competing app writers.
 
 SQLite/WASM runs exclusively in the main process, avoiding native SQLite rebuilds. It exports the full database after mutations, suitable for a small personal database; large datasets need a native adapter/worker. Ordinary order and shipment metadata are stored unencrypted locally. Automatic backup management and encryption of other future sensitive profile fields are not implemented.
 
@@ -98,6 +98,7 @@ electron/database.ts          SQLite schema, migration and transactions
 electron/inbox/credentials.ts Native Windows Credential Manager adapter
 electron/inbox/gmail.ts       Read-only Gmail IMAP provider
 electron/inbox/extract.ts     Conservative shipment extraction
+electron/inbox/email-update.ts Forwarded confirmation/untracked-delivery classification
 electron/inbox/service.ts     Scheduling, concurrency, redaction and orchestration
 src/InboxPanel.tsx            Gmail settings and shipment review
 src/App.tsx                   Dashboard, routes, orders and collection

@@ -9,7 +9,12 @@ import {
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { InboxAccount, Shipment, ShipmentEvent } from "../src/inbox-types";
+import type {
+  InboxAccount,
+  Shipment,
+  ShipmentEvent,
+  EmailUpdate,
+} from "../src/inbox-types";
 import type { ScanResult } from "./inbox/gmail";
 import type { Snapshot, NewOrder } from "../src/types";
 export const orderSchema = z
@@ -54,7 +59,7 @@ export class Store {
     );
     const version =
       this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
-    if (Number(version) > 2) throw new Error("Unsupported database version");
+    if (Number(version) > 3) throw new Error("Unsupported database version");
     if (Number(version) < 1) {
       this.db.run(
         `BEGIN; CREATE TABLE orders(id TEXT PRIMARY KEY,name TEXT NOT NULL,store TEXT NOT NULL,category TEXT NOT NULL,total REAL NOT NULL CHECK(total>=0),status TEXT NOT NULL CHECK(status IN ('Delivered','In transit','Processing','Cancelled')),date TEXT NOT NULL); CREATE TABLE collection(id TEXT PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),purchase REAL NOT NULL,market REAL NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO migrations VALUES(1);`,
@@ -78,6 +83,21 @@ export class Store {
         CREATE TABLE inbox_account(id INTEGER PRIMARY KEY CHECK(id=1),email TEXT NOT NULL,auto INTEGER NOT NULL DEFAULT 0 CHECK(auto IN (0,1)),lastSync TEXT,error TEXT,scanned INTEGER NOT NULL DEFAULT 0,skipped INTEGER NOT NULL DEFAULT 0,limited INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE shipments(id TEXT PRIMARY KEY,tracking TEXT NOT NULL UNIQUE,carrier TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('In transit','Out for delivery','Delivered')),received TEXT NOT NULL,subject TEXT NOT NULL,orderId TEXT REFERENCES orders(id) ON DELETE SET NULL);
         INSERT INTO migrations VALUES(2); COMMIT;`);
+      this.persist();
+    }
+    if (Number(version) < 3) {
+      if (
+        this.path &&
+        Number(version) > 0 &&
+        !existsSync(this.path + ".pre-inbox-v2.bak")
+      )
+        writeFileSync(this.path + ".pre-inbox-v2.bak", this.db.export(), {
+          flag: "wx",
+          mode: 0o600,
+        });
+      this.db.run(
+        `BEGIN; CREATE TABLE inbox_updates(id TEXT PRIMARY KEY,externalId TEXT NOT NULL UNIQUE,subject TEXT NOT NULL,received TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('Order confirmed','In transit','Out for delivery','Delivered','Needs review')),orderReference TEXT,orderId TEXT REFERENCES orders(id) ON DELETE SET NULL); INSERT INTO migrations VALUES(3); COMMIT;`,
+      );
       this.persist();
     }
   }
@@ -200,7 +220,7 @@ export class Store {
   connectInbox(email: string, scan: ScanResult) {
     this.mutate(() => {
       if (this.inboxAccount()?.email !== email)
-        this.db.run("DELETE FROM shipments");
+        this.db.run("DELETE FROM shipments; DELETE FROM inbox_updates");
       this.db.run(
         "INSERT OR REPLACE INTO inbox_account(id,email,auto) VALUES(1,?,0)",
         [email],
@@ -222,6 +242,19 @@ export class Store {
           event.status,
           event.received,
           event.subject,
+        ],
+      );
+    }
+    for (const u of scan.updates || []) {
+      this.db.run(
+        "INSERT INTO inbox_updates(id,externalId,subject,received,status,orderReference) VALUES(?,?,?,?,?,?) ON CONFLICT(externalId) DO NOTHING",
+        [
+          randomUUID(),
+          u.externalId,
+          u.subject,
+          u.received,
+          u.status,
+          u.orderReference,
         ],
       );
     }
@@ -249,8 +282,48 @@ export class Store {
   }
   disconnectInbox() {
     this.mutate(() =>
-      this.db.run("DELETE FROM shipments; DELETE FROM inbox_account"),
+      this.db.run(
+        "DELETE FROM inbox_updates; DELETE FROM shipments; DELETE FROM inbox_account",
+      ),
     );
+  }
+  emailUpdates(): EmailUpdate[] {
+    return this.rows("inbox_updates").sort((a, b) =>
+      String(b.received).localeCompare(String(a.received)),
+    ) as unknown as EmailUpdate[];
+  }
+  applyEmailUpdate(input: unknown) {
+    const { updateId, orderId } = z
+      .object({ updateId: z.string().uuid(), orderId: z.string().uuid() })
+      .strict()
+      .parse(input);
+    this.mutate(() => {
+      const update = this.emailUpdates().find((u) => u.id === updateId);
+      const order = this.snapshot().orders.find((o) => o.id === orderId);
+      if (!update || !order || order.status === "Cancelled")
+        throw Error("Invalid link");
+      const status =
+        update.status === "Delivered"
+          ? "Delivered"
+          : update.status === "Order confirmed"
+            ? "Processing"
+            : update.status === "Needs review"
+              ? order.status
+              : "In transit";
+      const rank = {
+        Processing: 0,
+        "In transit": 1,
+        Delivered: 2,
+        Cancelled: 3,
+      };
+      if (rank[status] < rank[order.status])
+        throw Error("Cannot move order backward");
+      this.db.run("UPDATE inbox_updates SET orderId=? WHERE id=?", [
+        orderId,
+        updateId,
+      ]);
+      this.db.run("UPDATE orders SET status=? WHERE id=?", [status, orderId]);
+    });
   }
   applyShipment(input: unknown) {
     const { shipmentId, orderId } = z

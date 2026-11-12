@@ -21,8 +21,26 @@ export type InboxAccount = {
 export type InboxState = {
   account: InboxAccount | null;
   shipments: Shipment[];
+  updates?: EmailUpdate[];
   syncing: boolean;
   supported: boolean;
 };
 export type InboxResult = { ok: boolean; state: InboxState; error?: string };
 export type GmailConnection = { email: string; appPassword: string };
+
+export type EmailUpdateStatus =
+  | "Order confirmed"
+  | "In transit"
+  | "Out for delivery"
+  | "Delivered"
+  | "Needs review";
+export type EmailUpdate = {
+  id: string;
+  externalId: string;
+  subject: string;
+  received: string;
+  status: EmailUpdateStatus;
+  orderReference: string | null;
+  orderId: string | null;
+};
+export type EmailUpdateEvent = Omit<EmailUpdate, "id" | "orderId">;

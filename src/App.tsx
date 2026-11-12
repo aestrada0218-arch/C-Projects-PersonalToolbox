@@ -234,7 +234,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.2.0</span>
+            <span>v0.2.1</span>
           </div>
         </div>
       </aside>

@@ -45,6 +45,7 @@ export class InboxService {
     return {
       account: this.store.inboxAccount(),
       shipments: this.store.shipments(),
+      updates: this.store.emailUpdates(),
       syncing: this.busy,
       supported: this.supported,
     };
@@ -191,6 +192,17 @@ export class InboxService {
       return this.result();
     } catch {
       return this.result(errors.storage);
+    }
+  }
+  linkUpdate(input: unknown) {
+    if (this.busy) return this.result(errors.busy);
+    try {
+      this.store.applyEmailUpdate(input);
+      return this.result();
+    } catch {
+      return this.result(
+        "Choose an existing order that is not cancelled. Earlier emails cannot move an order backward.",
+      );
     }
   }
   link(input: unknown) {

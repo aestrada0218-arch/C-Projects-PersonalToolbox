@@ -8,7 +8,12 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import type { Order } from "./types";
-import type { InboxResult, InboxState, Shipment } from "./inbox-types";
+import type {
+  InboxResult,
+  InboxState,
+  Shipment,
+  EmailUpdate,
+} from "./inbox-types";
 const initial: InboxState = {
   account: null,
   shipments: [],
@@ -77,6 +82,11 @@ export default function InboxPanel({
   }
   const disabled = busy || state.syncing;
   const account = state.account;
+  const updates = (state.updates || []).filter((u) =>
+    (u.subject + " " + (u.orderReference || ""))
+      .toLowerCase()
+      .includes(query.toLowerCase()),
+  );
   const shipments = state.shipments.filter((s) =>
     (s.tracking + " " + s.carrier + " " + s.subject)
       .toLowerCase()
@@ -271,10 +281,68 @@ export default function InboxPanel({
         </p>
       </section>
       <section className="panel">
+        {" "}
+        <div className="table-toolbar">
+          <label className="search">
+            <input
+              aria-label="Search inbox updates"
+              placeholder="Search tracking, carrier, order reference, or subject…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+      <section className="panel">
         <div className="panel-heading">
           <div>
             <h2>
-              Detected shipments{" "}
+              Email updates without tracking{" "}
+              <span className="count">{(state.updates || []).length}</span>
+            </h2>
+            <p>
+              Order confirmations and delivery emails can appear even when no
+              supported tracking number is found.
+            </p>
+          </div>
+          <Mail size={18} />
+        </div>
+        {!updates.length ? (
+          <div className="empty">
+            <p>
+              No matching untracked updates yet. Click Refresh now after
+              forwarding a confirmation or shipping email to this Gmail INBOX.
+            </p>
+          </div>
+        ) : (
+          <div>
+            {updates.map((update) => (
+              <EmailUpdateRow
+                key={update.id}
+                update={update}
+                orders={orders}
+                disabled={disabled}
+                onApply={async (orderId) => {
+                  const ok = await action(
+                    () =>
+                      window.toolbox!.linkEmailUpdate({
+                        updateId: update.id,
+                        orderId,
+                      }),
+                    "Email update linked to the selected order.",
+                  );
+                  if (ok) onOrdersChanged();
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <h2>
+              Shipments with tracking{" "}
               <span className="count">{state.shipments.length}</span>
             </h2>
             <p>
@@ -282,16 +350,6 @@ export default function InboxPanel({
             </p>
           </div>
           <Truck size={18} />
-        </div>
-        <div className="table-toolbar">
-          <label className="search">
-            <input
-              aria-label="Search shipments"
-              placeholder="Search tracking number, carrier, or subject…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
         </div>
         {!shipments.length ? (
           <div className="empty">
@@ -464,6 +522,62 @@ function ShipmentRow({
         >
           <CheckCircle2 size={14} />
           Apply status
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function EmailUpdateRow({
+  update: u,
+  orders,
+  disabled,
+  onApply,
+}: {
+  update: EmailUpdate;
+  orders: Order[];
+  disabled: boolean;
+  onApply: (id: string) => Promise<void>;
+}) {
+  const [selected, setSelected] = useState(u.orderId || "");
+  return (
+    <article className="shipment-row">
+      <div className="shipment-info">
+        <div>
+          <span className="badge processing">{u.status}</span>
+          {u.orderReference && <code>Order #{u.orderReference}</code>}
+        </div>
+        <p>{u.subject}</p>
+        <small>
+          Received {new Date(u.received).toLocaleString()}{" "}
+          {u.orderId && "· Linked to an order"}
+        </small>
+        <small>
+          No recognized tracking number. Review this email-derived update.
+        </small>
+      </div>
+      <div className="shipment-apply">
+        <select
+          aria-label={"Order for email " + u.id}
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+          disabled={disabled}
+        >
+          <option value="">Choose an existing order…</option>
+          {orders
+            .filter((o) => o.status !== "Cancelled")
+            .map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name} · {o.store} · {o.id.slice(0, 8)}
+              </option>
+            ))}
+        </select>
+        <button
+          className="primary"
+          disabled={disabled || !selected}
+          onClick={() => void onApply(selected)}
+        >
+          {u.status === "Needs review" ? "Link to order" : "Apply email status"}
         </button>
       </div>
     </article>

@@ -68,3 +68,37 @@ it("caps a large result set at the newest 100 matches", async () => {
   expect(client.fetchOne).toHaveBeenCalledTimes(100);
   expect(client.fetchOne.mock.calls[0][0]).toBe(150);
 });
+it("keeps both forwarded email examples when neither contains recognized tracking", async () => {
+  client.search.mockResolvedValue([10, 11]);
+  client.fetchOne.mockImplementation(async (id: number, query: any) =>
+    query.size
+      ? { size: 500 }
+      : {
+          source: Buffer.from(
+            "Message-ID: <test-" +
+              id +
+              "@example.invalid>\r\nSubject: " +
+              (id === 10
+                ? "Fwd: Order #98765432 confirmed"
+                : "Fwd: Out for delivery 1 item: Example item") +
+              "\r\nContent-Type: text/plain\r\n\r\n---------- Forwarded message ---------\r\nNo visible tracking number",
+          ),
+          internalDate: new Date("2026-11-12T12:00:00Z"),
+        },
+  );
+  const provider = new GmailImapProvider();
+  const secret = { email: "test@gmail.com", appPassword: "abcdefghijklmnop" };
+  const result = await provider.scan(secret);
+  expect(result.events).toEqual([]);
+  expect(result.updates?.map((u) => u.status)).toEqual([
+    "Out for delivery",
+    "Order confirmed",
+  ]);
+  expect(client.search.mock.calls.at(-1)?.[0].or).toContainEqual({
+    subject: "confirmed",
+  });
+  const again = await provider.scan(secret);
+  expect(again.updates?.map((u) => u.externalId)).toEqual(
+    result.updates?.map((u) => u.externalId),
+  );
+});
