@@ -5,6 +5,8 @@ import { Store } from "./database";
 import { InboxService } from "./inbox/service";
 import { WindowsCredentialVault } from "./inbox/credentials";
 import { GmailImapProvider } from "./inbox/gmail";
+import { registerExpenseHandlers } from "./expenses/ipc";
+let stopExpenseTimer: (() => void) | undefined;
 let inbox: InboxService;
 let store: Store;
 let window: BrowserWindow;
@@ -107,6 +109,12 @@ else {
         );
         return true;
       });
+      stopExpenseTimer = registerExpenseHandlers(
+        store.expenses,
+        () => window,
+        handle,
+      );
+
       createWindow();
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -123,6 +131,7 @@ else {
     if (process.platform !== "darwin") app.quit();
   });
   app.on("before-quit", () => {
+    stopExpenseTimer?.();
     inbox?.stop();
     store?.close();
   });

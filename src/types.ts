@@ -1,3 +1,11 @@
+import type {
+  ExpenseInput,
+  ExpenseState,
+  ExpenseResult,
+  ExpenseImportPreview,
+  ExpenseExportResult,
+  ScheduleInput,
+} from "./expense-types";
 import type { InboxState, InboxResult, GmailConnection } from "./inbox-types";
 export type Order = {
   id: string;
@@ -24,6 +32,25 @@ export type Snapshot = {
 export type NewOrder = Omit<Order, "id">;
 export interface ToolboxAPI {
   snapshot(): Promise<Snapshot>;
+  expenseState(): Promise<ExpenseState>;
+  addExpense(input: ExpenseInput): Promise<ExpenseResult>;
+  editExpense(input: {
+    id: string;
+    expense: ExpenseInput;
+  }): Promise<ExpenseResult>;
+  editExpenseSchedule(input: {
+    id: string;
+    schedule: ScheduleInput;
+  }): Promise<ExpenseResult>;
+  stopExpenseSchedule(id: string): Promise<ExpenseResult>;
+  deleteExpense(input: {
+    id: string;
+    stopSeries: boolean;
+  }): Promise<ExpenseResult>;
+  deleteAllExpenses(): Promise<ExpenseResult>;
+  previewExpenseImport(): Promise<ExpenseImportPreview>;
+  commitExpenseImport(token: string): Promise<ExpenseResult>;
+  exportExpenses(): Promise<ExpenseExportResult>;
   inboxState(): Promise<InboxState>;
   connectGmail(input: GmailConnection): Promise<InboxResult>;
   refreshInbox(): Promise<InboxResult>;

@@ -16,7 +16,7 @@ it("migrates a Stage 1 database without losing orders and never persists app pas
     });
     const v1 = new SQL.Database(readFileSync(path));
     v1.run(
-      "DROP TABLE inbox_updates; DROP TABLE shipments; DROP TABLE inbox_account; DELETE FROM migrations WHERE version>=2",
+      "DROP TABLE expenses; DROP TABLE expense_schedules; DROP TABLE inbox_updates; DROP TABLE shipments; DROP TABLE inbox_account; DELETE FROM migrations WHERE version>=2",
     );
     writeFileSync(path, v1.export());
     v1.close();
@@ -71,7 +71,9 @@ it("upgrades a connected v0.2 inbox while preserving account settings and tracke
       locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm"),
     });
     const v2 = new SQL.Database(readFileSync(path));
-    v2.run("DROP TABLE inbox_updates; DELETE FROM migrations WHERE version=3");
+    v2.run(
+      "DROP TABLE expenses; DROP TABLE expense_schedules; DROP TABLE inbox_updates; DELETE FROM migrations WHERE version>=3",
+    );
     writeFileSync(path, v2.export());
     v2.close();
     db = await Store.open(path);

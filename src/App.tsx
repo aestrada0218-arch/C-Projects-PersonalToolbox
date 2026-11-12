@@ -1,3 +1,4 @@
+import ExpensesPanel from "./ExpensesPanel";
 import InboxPanel from "./InboxPanel";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -66,7 +67,6 @@ const plans: Record<string, string> = {
   Profiles:
     "Manage account and shipping profiles with secure sensitive fields and validated CSV import.",
 
-  Expenses: "Track shipping, taxes, marketplace fees, and realized profit.",
   Settings:
     "Configure preferences, notifications, database backups, and storage.",
 };
@@ -234,7 +234,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.2.1</span>
+            <span>v0.3.0</span>
           </div>
         </div>
       </aside>
@@ -252,40 +252,45 @@ export default function App() {
           </div>
         </header>
         <main>
-          <div className="title-row">
-            <div>
-              <div className="eyebrow">YOUR WORKSPACE, AT A GLANCE</div>
-              <h1>
-                {page === "Analytics" ? "Overview" : page}
-                <span className="gold">.</span>
-              </h1>
-              <p>
-                {page === "Analytics"
-                  ? "A little clarity for everything you collect, track, and manage."
-                  : page === "Orders"
-                    ? "Every purchase, from checkout to your doorstep."
-                    : page === "Collection"
-                      ? "Your collection. A clearer picture of its value."
-                      : "Make room for a more organized day."}
-              </p>
-            </div>
-            <div className="actions">
-              {["Analytics", "Orders"].includes(page) && (
-                <select
-                  aria-label="Date range"
-                  value={range}
-                  onChange={(e) => setRange(e.target.value)}
-                >
-                  <option value="90">Last 90 days</option>
-                  <option value="30">Last 30 days</option>
-                  <option value="7">Last 7 days</option>
-                </select>
-              )}
-              <button className="primary" onClick={() => setModal(true)}>
-                <Plus size={16} /> Add order
-              </button>
-            </div>
-          </div>
+          {page !== "Expenses" && (
+            <>
+              {" "}
+              <div className="title-row">
+                <div>
+                  <div className="eyebrow">YOUR WORKSPACE, AT A GLANCE</div>
+                  <h1>
+                    {page === "Analytics" ? "Overview" : page}
+                    <span className="gold">.</span>
+                  </h1>
+                  <p>
+                    {page === "Analytics"
+                      ? "A little clarity for everything you collect, track, and manage."
+                      : page === "Orders"
+                        ? "Every purchase, from checkout to your doorstep."
+                        : page === "Collection"
+                          ? "Your collection. A clearer picture of its value."
+                          : "Make room for a more organized day."}
+                  </p>
+                </div>
+                <div className="actions">
+                  {["Analytics", "Orders"].includes(page) && (
+                    <select
+                      aria-label="Date range"
+                      value={range}
+                      onChange={(e) => setRange(e.target.value)}
+                    >
+                      <option value="90">Last 90 days</option>
+                      <option value="30">Last 30 days</option>
+                      <option value="7">Last 7 days</option>
+                    </select>
+                  )}
+                  <button className="primary" onClick={() => setModal(true)}>
+                    <Plus size={16} /> Add order
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
           {error && (
             <div role="alert" className="alert">
               {error} <button onClick={reload}>Retry</button>
@@ -692,6 +697,7 @@ export default function App() {
                   </div>
                 </section>
               )}
+              {page === "Expenses" && <ExpensesPanel />}
               {page === "Inbox" && (
                 <InboxPanel orders={data.orders} onOrdersChanged={reload} />
               )}
@@ -735,7 +741,7 @@ export default function App() {
                 ? "Local database connected"
                 : "Desktop connection required"}
             </span>
-            <span>v0.2 · Sample data included.</span>
+            <span>v0.3 · Sample data included.</span>
           </footer>
         </main>
       </div>

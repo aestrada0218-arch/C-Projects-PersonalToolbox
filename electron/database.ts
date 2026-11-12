@@ -1,3 +1,5 @@
+import { ExpenseRepository } from "./expenses/store";
+import { expenseMigration } from "./expenses/model";
 import initSqlJs, { Database } from "sql.js";
 import {
   existsSync,
@@ -34,6 +36,10 @@ export const orderSchema = z
   })
   .strict();
 export class Store {
+  readonly expenses = new ExpenseRepository(
+    () => this.db,
+    (fn) => this.mutate(fn),
+  );
   private constructor(
     private db: Database,
     private path: string | undefined,
@@ -59,7 +65,7 @@ export class Store {
     );
     const version =
       this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
-    if (Number(version) > 3) throw new Error("Unsupported database version");
+    if (Number(version) > 4) throw new Error("Unsupported database version");
     if (Number(version) < 1) {
       this.db.run(
         `BEGIN; CREATE TABLE orders(id TEXT PRIMARY KEY,name TEXT NOT NULL,store TEXT NOT NULL,category TEXT NOT NULL,total REAL NOT NULL CHECK(total>=0),status TEXT NOT NULL CHECK(status IN ('Delivered','In transit','Processing','Cancelled')),date TEXT NOT NULL); CREATE TABLE collection(id TEXT PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),purchase REAL NOT NULL,market REAL NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO migrations VALUES(1);`,
@@ -97,6 +103,23 @@ export class Store {
         });
       this.db.run(
         `BEGIN; CREATE TABLE inbox_updates(id TEXT PRIMARY KEY,externalId TEXT NOT NULL UNIQUE,subject TEXT NOT NULL,received TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('Order confirmed','In transit','Out for delivery','Delivered','Needs review')),orderReference TEXT,orderId TEXT REFERENCES orders(id) ON DELETE SET NULL); INSERT INTO migrations VALUES(3); COMMIT;`,
+      );
+      this.persist();
+    }
+    if (Number(version) < 4) {
+      if (
+        this.path &&
+        Number(version) > 0 &&
+        !existsSync(this.path + ".pre-expenses-v3.bak")
+      )
+        writeFileSync(this.path + ".pre-expenses-v3.bak", this.db.export(), {
+          flag: "wx",
+          mode: 0o600,
+        });
+      this.db.run(
+        "BEGIN;" +
+          expenseMigration +
+          " INSERT INTO migrations VALUES(4); COMMIT;",
       );
       this.persist();
     }

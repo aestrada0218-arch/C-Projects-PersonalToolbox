@@ -1,4 +1,4 @@
-# Personal Toolbox · v0.2.1
+# Personal Toolbox · v0.3.0
 
 A Windows desktop app built with Electron, React, TypeScript, Vite, Tailwind CSS, SQLite (sql.js), Recharts, and Playwright. Original dark-and-gold interface. Version 0.2 adds Gmail shipment monitoring to the Stage 1 dashboard.
 
@@ -23,6 +23,27 @@ node scripts/repair-electron.cjs
 ```
 
 To update an existing installation, close the app, download the latest source ZIP, and copy the extracted source folder's contents into your existing project folder, choosing Replace. Keep your existing `node_modules` folder so its repaired Electron binary remains installed. Run `npm install` to add new dependencies, then `npm run dev`. The local database is stored separately in AppData.
+
+## Expenses
+
+The Expenses screen includes category tabs for **All**, **Proxy Providers**, **Cook Groups**, **Shipping Costs**, **My Collection**, and **Other Expenses**, with per-category entry counts, search by description/provider/retailer, and a paginated ledger. Financial expenses start empty; sample orders/collection entries are never imported into this ledger automatically.
+
+Use **Add expense** to enter description, optional provider/retailer, category, amount in USD, and date. Enable **Recurring** and choose **1 month**, **3 months**, **6 months**, or **Yearly (12 months)**. The amount is the cost per billing period: a $90 quarterly plan contributes $30 to **Recurring / mo**.
+
+- **Total spend** sums all recorded charges due through today's local calendar date, across all categories. **This month** includes due charges in the current calendar month. Future-dated entries appear as Scheduled and are excluded from these spending totals until due. **Entries** counts ledger rows, including future-dated ones. **Recurring / mo** is the rounded monthly equivalent of all active schedules, including future starts; it is a budget estimate, not this month's payments.
+- Each recurring occurrence becomes an actual local ledger row with its own date and amount. The app records due charges at startup, on expense reads, and once per minute while running. When reopened, it catches up missed periods. A past start date immediately adds overdue charges. Large backlogs are processed in batches of at most 5,000 occurrences, with a visible notice until caught up. This is bookkeeping based on your schedule, not a bank connection or payment service.
+- Recurrence is calculated from the original calendar anchor: January 31 → February 28/29 → March 31. Annual February 29 schedules return to February 29 in leap years. Unique series/date constraints and persisted occurrence cursors prevent duplicates after refresh/restart or deletion of a historical row.
+- **Edit charge** changes one recorded entry only. **Edit schedule** changes future description/provider/category/amount/interval and the next billing date without rewriting past entries. Choose a next date today or later; a charge already recorded for that series/date is not duplicated.
+- **Stop repeats** preserves past charges. Deleting a charge offers a checkbox to also stop its series. Deleting a charge without stopping its series leaves future repeats active and does not recreate that deleted historical charge. **Delete all** requires confirmation and clears expenses plus schedules across every category. Existing orders, collection and inbox data remain intact.
+- Category tabs and search filter the ledger, category subtotal and visible active schedules. Summary cards remain workspace-wide. Money uses integer cents; amount fields accept at most two decimal places. Dates support 1900–2199.
+
+### Expense CSV
+
+**Import CSV** opens a native file dialog, validates the entire file, then shows a preview. Nothing is saved until you confirm. Invalid files are rejected as a whole with a row number; successful imports are transactional. Files are limited to 8 MiB and 20,000 source records.
+
+For a simple spreadsheet, required columns are `description,category,amount,date`; optional columns are `provider,retailer,recurring_months,id`. Use the category names above, amounts such as `12.50`, dates as `YYYY-MM-DD`, and `recurring_months` of `0`, `1`, `3`, `6`, or `12`. A missing interval means a one-time expense. Simple rows with a recurring interval create new automatic schedules, including catch-up charges if the start date is in the past. Rows without IDs append new records on each import.
+
+**Export CSV** exports all categories and all recurring schedules, not just the selected tab. To support lossless schedule/charge restoration, exported files also have `record_type` (`charge`/`schedule`), `schedule_id`, `active`, and `next_index`. Schedule rows define future repeats, while charge rows preserve historical payment amounts and dates; schedule IDs and charge IDs must be unique. Reimporting an exported file skips existing IDs instead of duplicating them and does not overwrite existing records. Keep schedule rows when restoring charges that reference them. CSV quoting supports commas, newlines and escaped quotes. Spreadsheet formulas are neutralized with a leading apostrophe on export, which remains visible if imported into a different database.
 
 ## Connect Gmail
 
@@ -53,13 +74,13 @@ The credential is a **Google app password**, which grants mailbox access. This a
 - Analytics: period filters, interactive spending/category charts, collection value, order and shipment counts.
 - Orders: validated creation, product/store/ID search, status/date filters, all-order CSV export through a save dialog. Spreadsheet formulas are neutralized.
 - Collection: read-only seeded inventory, quantities, cost/value and unrealized profit.
-- Tasks, Proxies, Profiles, Expenses and Settings show later-stage scope. Their sample task rows do not run; the opt-in Inbox schedule is independent.
+- Tasks, Proxies, Profiles and Settings show later-stage scope. Their sample task rows do not run; the opt-in Inbox schedule is independent.
 
 A new database receives 36 illustrative orders, six collection entries and three paused sample tasks. **Inbox starts empty and never mixes sample emails with your account.** Collection values are illustrative, not live market feeds. Spending excludes cancelled orders; collection value covers all inventory. All amounts are USD. Unrealized profit excludes fees and taxes.
 
 ## Storage, migrations, and security
 
-Electron `app.getPath('userData')/personal-toolbox.sqlite` is the database (normally `%APPDATA%/personal-toolbox/`). Close the app before copying or restoring it. Migration 1 creates the original schema and samples. Migration 2 adds the inbox tables and preserves existing records; migration 3 adds the untracked-email review table and preserves connected account settings/shipments, with a `.pre-inbox-v2.bak` snapshot before upgrading an existing database; an existing Stage 1 database receives a `.pre-inbox-v1.bak` snapshot before migration. Unknown future versions are rejected. Writes use transactions, bound SQL parameters, atomic replacement, and in-memory rollback on persistence failure. A single-instance lock prevents competing app writers.
+Electron `app.getPath('userData')/personal-toolbox.sqlite` is the database (normally `%APPDATA%/personal-toolbox/`). Close the app before copying or restoring it. Migration 1 creates the original schema and samples. Migration 2 adds the inbox tables and preserves existing records; migration 3 adds the untracked-email review table and preserves connected account settings/shipments, with a `.pre-inbox-v2.bak` snapshot before upgrading an existing database; an existing Stage 1 database receives a `.pre-inbox-v1.bak` snapshot before migration. Migration 4 adds expense/schedule tables and saves a `.pre-expenses-v3.bak` snapshot of an existing database before upgrading. Unknown future versions are rejected. Writes use transactions, bound SQL parameters, atomic replacement, and in-memory rollback on persistence failure. A single-instance lock prevents competing app writers.
 
 SQLite/WASM runs exclusively in the main process, avoiding native SQLite rebuilds. It exports the full database after mutations, suitable for a small personal database; large datasets need a native adapter/worker. Ordinary order and shipment metadata are stored unencrypted locally. Automatic backup management and encryption of other future sensitive profile fields are not implemented.
 
@@ -100,6 +121,8 @@ electron/inbox/gmail.ts       Read-only Gmail IMAP provider
 electron/inbox/extract.ts     Conservative shipment extraction
 electron/inbox/email-update.ts Forwarded confirmation/untracked-delivery classification
 electron/inbox/service.ts     Scheduling, concurrency, redaction and orchestration
+src/ExpensesPanel.tsx         Expense ledger, category tabs and native dialogs
+electron/expenses/           Recurrence, validation, persistence, CSV and IPC
 src/InboxPanel.tsx            Gmail settings and shipment review
 src/App.tsx                   Dashboard, routes, orders and collection
 scripts/repair-electron.cjs   Verified Windows Electron binary repair
@@ -108,6 +131,6 @@ tests/                       Database, provider, service and Electron UI tests
 
 ## Validation and remaining stages
 
-Linux verification: TypeScript/Electron/Vite production build; database persistence/migration/failure tests; extraction, duplicate handling, credential-save ordering/rollback, authentication redaction, scheduling and concurrency; TLS/read-only/bounded provider checks; actual Electron dashboard and Inbox UI flows with fixtures. Native Windows credential testing and a live Gmail connection cannot be exercised on this Linux executor. The Windows-only test is included for that verification.
+Linux verification: TypeScript/Electron/Vite production build; database persistence/migration/failure tests; extraction, duplicate handling, credential-save ordering/rollback, authentication redaction, scheduling and concurrency; TLS/read-only/bounded provider checks; actual Electron dashboard/Inbox UI flows, plus the real persistent Expenses UI covering all four intervals, category/search/keyboard navigation, CSV preview/import/export, charge/schedule edits, delete confirmations and restart persistence. Expense tests cover calendar clamping, cents, catch-up/deduplication, future entries, CSV round-trip/rollback and migration from v0.2.1. Native Windows credential testing and a live Gmail connection cannot be exercised on this Linux executor. The Windows-only test is included for that verification.
 
-Next: complete order/shipping editing/import, collection CRUD/images, expense ledger and secure profiles; then bounded authorized task automation, more email adapters/OAuth, preferences/backups, and Windows release hardening. No CAPTCHA bypass, queue circumvention, or site-limit evasion is implemented.
+Next: complete order/shipping editing/import, collection CRUD/images, secure profiles and a fuller profit/fee ledger; then bounded authorized task automation, more email adapters/OAuth, preferences/backups, and Windows release hardening. No CAPTCHA bypass, queue circumvention, or site-limit evasion is implemented.
