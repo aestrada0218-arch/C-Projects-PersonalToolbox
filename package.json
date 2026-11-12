@@ -1,6 +1,6 @@
 {
   "name": "personal-toolbox",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "main": "dist-electron/electron/main.js",
   "scripts": {
@@ -14,6 +14,7 @@
     "format": "prettier --write src electron tests *.ts *.json *.cjs README.md index.html"
   },
   "dependencies": {
+    "html-to-text": "^10.0.1",
     "imapflow": "^2.11.0",
     "lucide-react": "^0.468.0",
     "mailparser": "^3.14.3",
@@ -25,6 +26,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.51.0",
+    "@types/html-to-text": "^9.0.4",
     "@types/mailparser": "^3.9.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",

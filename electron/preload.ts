@@ -2,6 +2,16 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "toolbox",
   Object.freeze({
+    shippingState: () => ipcRenderer.invoke("toolbox:shipping-state"),
+    checkSales: () => ipcRenderer.invoke("toolbox:shipping-check"),
+    setShippingMonitor: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:shipping-monitor", input),
+    addShippingTask: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:shipping-add", input),
+    editShippingTask: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:shipping-edit", input),
+    deleteShippingTask: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:shipping-delete", id),
     inboxState: () => ipcRenderer.invoke("toolbox:inbox-state"),
     connectGmail: (input: unknown) =>
       ipcRenderer.invoke("toolbox:connect-gmail", input),

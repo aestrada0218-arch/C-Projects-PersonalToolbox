@@ -17,6 +17,12 @@ import type {
   ScheduleInput,
 } from "./expense-types";
 import type { InboxState, InboxResult, GmailConnection } from "./inbox-types";
+import type {
+  ShippingState,
+  ShippingResult,
+  ShippingTaskInput,
+  ShippingMonitor,
+} from "./shipping-types";
 export type Order = {
   id: string;
   name: string;
@@ -42,6 +48,17 @@ export type Snapshot = {
 };
 export type NewOrder = Omit<Order, "id">;
 export interface ToolboxAPI {
+  shippingState(): Promise<ShippingState>;
+  checkSales(): Promise<ShippingResult>;
+  setShippingMonitor(
+    input: Pick<ShippingMonitor, "enabled" | "intervalHours">,
+  ): Promise<ShippingResult>;
+  addShippingTask(input: ShippingTaskInput): Promise<ShippingResult>;
+  editShippingTask(input: {
+    id: string;
+    item: ShippingTaskInput;
+  }): Promise<ShippingResult>;
+  deleteShippingTask(id: string): Promise<ShippingResult>;
   snapshot(): Promise<Snapshot>;
   collectionState(): Promise<CollectionState>;
   connectPricing(key: string): Promise<CollectionResult>;

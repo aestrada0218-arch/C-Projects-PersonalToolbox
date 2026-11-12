@@ -1948,3 +1948,282 @@ select:disabled {
   margin: 0 22px 16px;
   line-height: 1.7;
 }
+
+/* Outgoing sales tasks */
+.tasks-module {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.tasks-module .title-row {
+  margin-bottom: 0;
+}
+.shipping-stats {
+  margin-bottom: 0;
+}
+.shipping-overdue-text {
+  color: #e39a83 !important;
+}
+.shipping-monitor {
+  padding: 22px;
+}
+.shipping-monitor-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.shipping-monitor-heading h2 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #d3dbe6;
+}
+.shipping-monitor-heading p {
+  font-size: 11px;
+}
+.shipping-monitor-heading > .badge {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.shipping-mail-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #d6b56b12;
+  color: #c9aa68;
+  flex-shrink: 0;
+}
+.shipping-monitor-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px 25px;
+  padding: 20px 0 16px;
+  border-bottom: 1px solid #2b323d;
+}
+.shipping-monitor-controls label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+  color: #abb6c7;
+}
+.shipping-monitor-controls select {
+  padding: 7px 10px;
+  font-size: 11px;
+}
+.shipping-check-label input {
+  accent-color: #d6b56b;
+  width: 15px;
+  height: 15px;
+}
+.shipping-monitor-controls .text-button {
+  margin-left: auto;
+  font-size: 11px;
+}
+.shipping-monitor-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 30px;
+  font-size: 10px;
+  color: #8593a8;
+  margin: 15px 0 10px;
+}
+.shipping-help {
+  font-size: 10px;
+  line-height: 1.8;
+  max-width: 1000px;
+}
+.shipping-scan-count {
+  font-size: 10px;
+  color: #8290a3;
+  margin-top: 10px;
+}
+.shipping-review-note {
+  font-size: 10px;
+  color: #c6aa74;
+  margin-top: 6px;
+  line-height: 1.6;
+  display: block;
+}
+.shipping-monitor .alert {
+  margin: 12px 0 0;
+  font-size: 11px;
+}
+.shipping-tabs {
+  margin-bottom: 0;
+}
+.shipping-tabs button > span {
+  font-size: 10px;
+  color: #8c98ac;
+}
+.shipping-table-note {
+  font-size: 10px;
+  color: #75869d;
+}
+.shipping-list table td {
+  vertical-align: middle;
+}
+.shipping-list table small {
+  display: block;
+  margin-top: 5px;
+  color: #7d8da3;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.shipping-list table .shipping-review-note {
+  color: #c6aa74;
+}
+.shipping-name {
+  max-width: 330px;
+  min-width: 200px;
+  white-space: normal;
+}
+.shipping-name > strong {
+  color: #d0d9e6;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.shipping-task-notes {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.shipping-source {
+  font-size: 11px;
+  color: #c2cddd;
+}
+.shipping-due {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.shipping-due strong {
+  font-size: 11px;
+  font-weight: 500;
+}
+.shipping-due-overdue,
+.shipping-list .shipping-due-overdue small {
+  color: #e39a83;
+}
+.shipping-due-today,
+.shipping-list .shipping-due-today small {
+  color: #dac18e;
+}
+.shipping-date-missing {
+  color: #c6aa74;
+  font-size: 10px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  max-width: 140px;
+  white-space: normal;
+  line-height: 1.6;
+}
+.shipping-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 13px;
+}
+.shipping-row-actions .text-button {
+  padding: 5px 0;
+  color: #899ab1;
+}
+.shipping-complete {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  font-size: 10px;
+  border: 1px solid #76623e;
+  border-radius: 6px;
+  color: #d2bc8b;
+  background: #d6b56b09;
+  white-space: nowrap;
+}
+.shipping-complete:hover {
+  background: #d6b56b18;
+}
+.shipping-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 50px 22px;
+}
+.shipping-empty > svg {
+  color: #bda26b;
+}
+.shipping-empty h3 {
+  color: #cbd5e3;
+  font-weight: 500;
+  font-size: 14px;
+}
+.shipping-empty p {
+  max-width: 570px;
+  font-size: 11px;
+}
+.shipping-automation {
+  padding: 25px;
+}
+.shipping-automation h2 {
+  font-size: 15px;
+  color: #ccd7e7;
+  margin-bottom: 12px;
+}
+.shipping-automation > p {
+  font-size: 12px;
+  margin-bottom: 20px;
+}
+.shipping-automation > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  border-top: 1px solid #2c3440;
+  font-size: 12px;
+  color: #a8b7cb;
+}
+.shipping-automation .badge {
+  margin-left: auto;
+}
+.shipping-dialog fieldset > label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  color: #b4c0d1;
+  margin: 14px 0;
+}
+.shipping-dialog textarea {
+  resize: vertical;
+  min-height: 80px;
+  border: 1px solid #303949;
+  background: #11151c;
+  border-radius: 5px;
+  color: #d4dce9;
+  padding: 10px;
+  font: inherit;
+}
+.shipping-dialog textarea:focus {
+  outline: 1px solid #b59b63;
+}
+@media (max-width: 1200px) {
+  .shipping-monitor-heading {
+    flex-wrap: wrap;
+  }
+  .shipping-row-actions {
+    gap: 8px;
+  }
+  .shipping-table-note {
+    display: none;
+  }
+  .tasks-module > .title-row {
+    align-items: flex-start;
+  }
+  .tasks-module .actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}

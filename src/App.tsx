@@ -1,4 +1,5 @@
 import CollectionPanel from "./CollectionPanel";
+import TasksPanel from "./TasksPanel";
 import ExpensesPanel from "./ExpensesPanel";
 import InboxPanel from "./InboxPanel";
 import { useEffect, useMemo, useState } from "react";
@@ -27,7 +28,6 @@ import {
   X,
   Command,
   ShieldCheck,
-  Activity,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -61,8 +61,6 @@ const nav = [
 ] as const;
 const empty: Snapshot = { orders: [], collection: [], tasks: [] };
 const plans: Record<string, string> = {
-  Tasks:
-    "Schedule authorized monitoring jobs, control retries and concurrency, and inspect redacted logs.",
   Proxies:
     "Organize proxy groups, test connectivity, and monitor health. Authentication will use Windows Credential Manager.",
   Profiles:
@@ -255,7 +253,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.4.1</span>
+            <span>v0.5.0</span>
           </div>
         </div>
       </aside>
@@ -273,7 +271,7 @@ export default function App() {
           </div>
         </header>
         <main>
-          {!["Expenses", "Collection"].includes(page) && (
+          {!["Expenses", "Collection", "Tasks"].includes(page) && (
             <>
               {" "}
               <div className="title-row">
@@ -690,34 +688,24 @@ export default function App() {
                 />
               )}
               {page === "Expenses" && <ExpensesPanel />}
+              {page === "Tasks" && (
+                <TasksPanel
+                  samples={data.tasks}
+                  onOpenInbox={() => setPage("Inbox")}
+                  onChanged={refreshCollectionSnapshot}
+                />
+              )}
               {page === "Inbox" && (
                 <InboxPanel orders={data.orders} onOrdersChanged={reload} />
               )}
               {plans[page] && (
                 <section className="panel planned">
                   <span className="planned-icon">
-                    {page === "Tasks" ? (
-                      <ListTodo size={28} />
-                    ) : (
-                      <BriefcaseBusiness size={28} />
-                    )}
+                    <BriefcaseBusiness size={28} />
                   </span>
                   <span className="stage-label">COMING IN A LATER STAGE</span>
                   <h2>{page}, thoughtfully connected.</h2>
                   <p>{plans[page]}</p>
-                  {page === "Tasks" && (
-                    <div className="sample-tasks">
-                      {data.tasks.map((t) => (
-                        <div key={t.id}>
-                          <Activity size={15} />
-                          {t.name}
-                          <span className="badge processing">
-                            {t.status} · Sample
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                   <div className="scope-note">
                     Stage 1 establishes the secure desktop shell, local
                     database, and analytics. This module is not active yet.
@@ -733,7 +721,7 @@ export default function App() {
                 ? "Local database connected"
                 : "Desktop connection required"}
             </span>
-            <span>v0.4 · Sample data included.</span>
+            <span>v0.5 · Sample data included.</span>
           </footer>
         </main>
       </div>

@@ -100,6 +100,20 @@ else {
       handle("toolbox:link-email-update", (input) => inbox.linkUpdate(input));
       handle("toolbox:link-shipment", (input) => inbox.link(input));
       inbox.start();
+      handle("toolbox:shipping-state", () => inbox.shippingState());
+      handle("toolbox:shipping-check", () => inbox.refreshSales());
+      handle("toolbox:shipping-monitor", (input) =>
+        inbox.setShippingMonitor(input),
+      );
+      handle("toolbox:shipping-add", (input) =>
+        inbox.shippingAction(() => store.shipping.add(input)),
+      );
+      handle("toolbox:shipping-edit", (input) =>
+        inbox.shippingAction(() => store.shipping.edit(input)),
+      );
+      handle("toolbox:shipping-delete", (id) =>
+        inbox.shippingAction(() => store.shipping.remove(id)),
+      );
       handle("toolbox:snapshot", () => store.snapshot());
       handle("toolbox:add-order", (input) => store.addOrder(input));
       handle("toolbox:export-orders", async () => {

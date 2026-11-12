@@ -50,7 +50,10 @@ test("desktop dashboard, secure renderer, persistence, filters, navigation", asy
       page.getByRole("heading", { name: "Collection inventory" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Tasks", exact: true }).click();
-    await expect(page.getByText("COMING IN A LATER STAGE")).toBeVisible();
+    await expect(
+      page.getByRole("tab", { name: /Needs Shipment/ }),
+    ).toBeVisible();
+    await expect(page.getByText("Your shipping queue is clear")).toBeVisible();
     await page.getByRole("button", { name: "Analytics", exact: true }).click();
     await page.getByRole("button", { name: "Dismiss notification" }).click();
     await expect(page.locator(".recharts-area-curve")).toHaveAttribute(

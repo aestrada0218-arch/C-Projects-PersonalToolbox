@@ -1,5 +1,7 @@
 import { CollectionRepository } from "./collection/store";
 import { collectionMigration } from "./collection/model";
+import { ShippingRepository } from "./shipping/store";
+import { shippingMigration } from "./shipping/model";
 import { ExpenseRepository } from "./expenses/store";
 import { expenseMigration } from "./expenses/model";
 import initSqlJs, { Database } from "sql.js";
@@ -38,6 +40,10 @@ export const orderSchema = z
   })
   .strict();
 export class Store {
+  readonly shipping = new ShippingRepository(
+    () => this.db,
+    (fn) => this.mutate(fn),
+  );
   readonly collection = new CollectionRepository(
     () => this.db,
     (fn) => this.mutate(fn),
@@ -71,7 +77,7 @@ export class Store {
     );
     const version =
       this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
-    if (Number(version) > 5) throw new Error("Unsupported database version");
+    if (Number(version) > 6) throw new Error("Unsupported database version");
     if (Number(version) < 1) {
       this.db.run(
         `BEGIN; CREATE TABLE orders(id TEXT PRIMARY KEY,name TEXT NOT NULL,store TEXT NOT NULL,category TEXT NOT NULL,total REAL NOT NULL CHECK(total>=0),status TEXT NOT NULL CHECK(status IN ('Delivered','In transit','Processing','Cancelled')),date TEXT NOT NULL); CREATE TABLE collection(id TEXT PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),purchase REAL NOT NULL,market REAL NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO migrations VALUES(1);`,
@@ -144,6 +150,23 @@ export class Store {
           collectionMigration +
           " INSERT INTO migrations VALUES(5); COMMIT;",
       );
+      this.persist();
+    }
+    if (Number(version) < 6) {
+      if (
+        this.path &&
+        Number(version) > 0 &&
+        !existsSync(this.path + ".pre-shipping-v5.bak")
+      )
+        writeFileSync(this.path + ".pre-shipping-v5.bak", this.db.export(), {
+          flag: "wx",
+          mode: 0o600,
+        });
+      this.db.run("BEGIN;" + shippingMigration);
+      // Existing connected accounts immediately become eligible for sales checks.
+      const account = this.inboxAccount();
+      if (account) this.shipping.bindAccountInTransaction(account.email);
+      this.db.run("INSERT INTO migrations VALUES(6); COMMIT;");
       this.persist();
     }
   }
@@ -275,6 +298,7 @@ export class Store {
         [email],
       );
       this.ingest(scan);
+      this.shipping.bindAccountInTransaction(email);
     });
   }
   recordInboxScan(scan: ScanResult) {
@@ -330,11 +354,12 @@ export class Store {
     );
   }
   disconnectInbox() {
-    this.mutate(() =>
+    this.mutate(() => {
       this.db.run(
         "DELETE FROM inbox_updates; DELETE FROM shipments; DELETE FROM inbox_account",
-      ),
-    );
+      );
+      this.shipping.unbindAccountInTransaction();
+    });
   }
   emailUpdates(): EmailUpdate[] {
     return this.rows("inbox_updates").sort((a, b) =>
