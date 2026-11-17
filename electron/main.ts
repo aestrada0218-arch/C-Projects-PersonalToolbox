@@ -3,7 +3,13 @@ import { CollectionService, type PricingSecret } from "./collection/service";
 import { JustTcgProvider } from "./collection/justtcg";
 import { TcgCatalogBrowser } from "./collection/browser";
 import { registerCollectionHandlers } from "./collection/ipc";
-import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, safeStorage } from "electron";
+import { EntryService } from "./entry/service";
+import { WindowsProfileCipher } from "./entry/crypto";
+import { PlaywrightEntryDriver, type ProxySecret } from "./entry/driver";
+import { GmailCodeProvider } from "./entry/codes";
+import { registerEntryHandlers } from "./entry/ipc";
+let entries: EntryService;
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
 import { Store } from "./database";
@@ -76,7 +82,20 @@ else {
     .then(async () => {
       store = await Store.open(
         join(app.getPath("userData"), "personal-toolbox.sqlite"),
+        { entryCipher: new WindowsProfileCipher(safeStorage) },
       );
+      entries = new EntryService(
+        store,
+        new PlaywrightEntryDriver(),
+        new GmailCodeProvider(),
+        new WindowsCredentialVault(),
+        new WindowsCredentialVault("PersonalToolbox/EntryGmail/v1"),
+        (id) =>
+          new WindowsCredentialVault<ProxySecret>(
+            "PersonalToolbox/EntryProxy/" + id,
+          ),
+      );
+      registerEntryHandlers(entries, store.entries, () => window, handle);
       selling = new SellingService(
         store.selling,
         new WindowsCredentialVault<EbayConnectionInput>(
@@ -187,6 +206,7 @@ else {
     if (process.platform !== "darwin") app.quit();
   });
   app.on("before-quit", () => {
+    entries?.shutdown();
     selling?.stop();
     collectionService?.stop();
     tcgBrowser?.close();

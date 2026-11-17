@@ -2,6 +2,43 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "toolbox",
   Object.freeze({
+    entryState: () => ipcRenderer.invoke("toolbox:entry-state"),
+    createEntryCampaign: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-campaign-create", input),
+    editEntryCampaign: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-campaign-edit", input),
+    entryProfile: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-profile", id),
+    editEntryProfile: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-profile-edit", input),
+    deleteEntryJob: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-job-delete", id),
+    retryEntryJob: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-job-retry", input),
+    previewEntryImport: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-import-preview", id),
+    commitEntryImport: (token: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-import-commit", token),
+    saveEntryTemplate: () => ipcRenderer.invoke("toolbox:entry-sample"),
+    saveEntryProxy: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-proxy-save", input),
+    deleteEntryProxy: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-proxy-delete", id),
+    testEntryProxy: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-proxy-test", id),
+    connectEntryGmail: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-gmail-connect", input),
+    disconnectEntryGmail: () =>
+      ipcRenderer.invoke("toolbox:entry-gmail-disconnect"),
+    startEntries: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-start", input),
+    answerEntryPrompt: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-answer", input),
+    focusEntryBrowser: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:entry-focus", id),
+    pauseEntries: () => ipcRenderer.invoke("toolbox:entry-pause"),
+    resumeEntries: () => ipcRenderer.invoke("toolbox:entry-resume"),
+    stopEntries: () => ipcRenderer.invoke("toolbox:entry-stop"),
     sellingState: () => ipcRenderer.invoke("toolbox:selling-state"),
     sellingCategory: (id: unknown) =>
       ipcRenderer.invoke("toolbox:selling-category", id),
