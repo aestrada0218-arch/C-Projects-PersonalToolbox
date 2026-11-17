@@ -68,6 +68,14 @@ export interface ToolboxAPI {
     id: string;
     enabled: boolean;
   }): Promise<MailboxResult>;
+  setOutstandingExpectedDate(input: {
+    ids: string[];
+    expectedDate: string | null;
+  }): Promise<MailboxResult>;
+  deleteOutstandingLines(input: {
+    ids: string[];
+    confirmed: true;
+  }): Promise<MailboxResult>;
   scanOutstanding(): Promise<MailboxResult>;
   scanMailboxes(id?: string): Promise<MailboxResult>;
   receiveOutstanding(input: {

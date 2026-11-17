@@ -31,3 +31,19 @@ CREATE TABLE outstanding_orders(id TEXT PRIMARY KEY,transactionId TEXT NOT NULL,
 CREATE TABLE outstanding_receipts(requestId TEXT PRIMARY KEY,lineId TEXT NOT NULL REFERENCES outstanding_orders(id),collectionId TEXT NOT NULL,quantity INTEGER NOT NULL,tab TEXT NOT NULL);
 ALTER TABLE collection ADD COLUMN purchaseDate TEXT;
 `;
+
+export const outstandingMigration = `ALTER TABLE outstanding_orders ADD COLUMN expectedDate TEXT;
+ALTER TABLE outstanding_orders ADD COLUMN deletedAt TEXT;`;
+export const outstandingIds = z
+  .array(z.string().uuid())
+  .min(1)
+  .max(10000)
+  .refine((ids) => new Set(ids).size === ids.length);
+export const expectedDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((s) => {
+    const d = new Date(s + "T12:00:00Z");
+    return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === s;
+  })
+  .nullable();

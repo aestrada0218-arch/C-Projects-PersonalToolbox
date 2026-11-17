@@ -128,6 +128,12 @@ else {
         mailboxes.refresh(undefined, false, true),
       );
       handle("toolbox:mailboxes-scan", (id) => mailboxes.refresh(id));
+      handle("toolbox:outstanding-date", (input) =>
+        mailboxes.setExpectedDate(input),
+      );
+      handle("toolbox:outstanding-delete", (input) =>
+        mailboxes.deleteLines(input),
+      );
       handle("toolbox:outstanding-receive", (input) =>
         mailboxes.receive(input),
       );

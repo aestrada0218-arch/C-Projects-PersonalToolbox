@@ -2,6 +2,10 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "toolbox",
   Object.freeze({
+    setOutstandingExpectedDate: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:outstanding-date", input),
+    deleteOutstandingLines: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:outstanding-delete", input),
     scanOutstanding: () => ipcRenderer.invoke("toolbox:outstanding-scan"),
     mailboxState: () => ipcRenderer.invoke("toolbox:mailboxes-state"),
     connectMailbox: (input: unknown) =>

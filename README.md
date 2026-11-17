@@ -1,4 +1,4 @@
-# Personal Toolbox · v0.8.1
+# Personal Toolbox · v0.8.2
 
 A Windows desktop app built with Electron, React, TypeScript, Vite, Tailwind CSS, SQLite (sql.js), Recharts, and Playwright. Original dark-and-gold interface. Version 0.6 adds direct eBay fixed-price selling, shared drafts, exact Mercari listing links, and persistent cross-listing follow-ups. Version 0.5 added eBay-email shipping tasks with ship-by dates and scheduled Gmail checks. Version 0.4.1 added illustrated card search and full-title matching. Version 0.4 added a multi-section collection, JustTCG catalog/pricing, saved quote history, and an isolated interactive TCGplayer catalog browser. The categorized expense ledger and recurring bookkeeping remain available.
 
@@ -305,3 +305,15 @@ Outstanding Orders now requests a receipt-only scan. An unrelated shipment/eBay 
 The per-inbox sales scanner now inherits the previous primary account's saved sales cursor, preventing an upgrade from replaying an older batch behind the existing sales monitor. Cursors from other accounts are never reused. Long receipt batches return completed progress before the hard timeout so a slower mailbox can continue in later batches. No database reset is required.
 
 Failures now identify the inbox and scan stage, with fixed guidance for missing credentials, rejected sign-in, certificate verification, network timeouts, unavailable folders and local storage. Initial primary-account errors are persisted even before a successful first scan. Raw IMAP responses, command text, mail contents and credentials are not exposed. If scanning still fails after updating, use the new error text to determine the next step; live Gmail authentication cannot be verified from development fixtures.
+
+### v0.8.2 — outstanding item controls
+
+FOC shipping and other shipping-charge rows are excluded from Outstanding Orders, including previously imported charges. The original charge rows remain in the local receipt audit data; they cannot be selected or received into collection.
+
+Each item now has an optional **Expected arrival** date. Click the row's **Set date** (or existing date) to edit it. Leave the date blank to clear it. Dates are estimates you enter yourself and do not change purchase dates, received quantities or collection values.
+
+Use row checkboxes or the header checkbox to select matching visible lines, then choose **Set expected date** or **Delete selected**. Changing the search or received-items filter clears the selection so hidden lines are not accidentally changed. Bulk date updates and deletes are transactional: an invalid/stale selection fails without partially changing the remaining lines.
+
+Deletion requires confirmation and applies only to the outstanding line. Any items already moved into collection remain there. A retained deletion marker prevents the same PayPal transaction/line from returning on a later scan or through another inbox. The row trash button supports single-line deletion as well.
+
+The schema-10 migration adds expected-arrival dates and deletion markers and creates a `.pre-outstanding-v9.bak` backup before changing an existing database. Existing receipts, scan progress, collection items and credentials are preserved. Tests cover v9 upgrades, real/invalid dates, date clearing, bulk selection, cancellation, persistence, no re-import after deletion and preservation of already-received items.

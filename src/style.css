@@ -2741,3 +2741,34 @@ select:disabled {
 .outstanding-orders table {
   min-width: 900px;
 }
+
+.outstanding-bulk {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid #2c2d34;
+}
+.outstanding-bulk > span {
+  color: #d7b569;
+  font-size: 12px;
+  margin-right: 8px;
+}
+.outstanding-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.outstanding-orders input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #d7b569;
+  cursor: pointer;
+}
+.outstanding-selected {
+  background: #d7b5690b;
+}
+.outstanding-orders table {
+  min-width: 1080px;
+}

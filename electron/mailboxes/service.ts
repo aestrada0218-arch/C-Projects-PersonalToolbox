@@ -160,6 +160,26 @@ export class MailboxService {
       return this.result("Could not update mailbox preferences.");
     }
   }
+  setExpectedDate(input: unknown) {
+    try {
+      this.store.mail.setExpectedDate(input);
+      return this.result();
+    } catch {
+      return this.result(
+        "Could not update the expected arrival date. Use a valid date or clear it; refresh if a selected line is no longer available. No lines were changed.",
+      );
+    }
+  }
+  deleteLines(input: unknown) {
+    try {
+      this.store.mail.deleteLines(input);
+      return this.result();
+    } catch {
+      return this.result(
+        "Could not delete the selected lines. Refresh and select available lines, then confirm deletion. No lines were deleted.",
+      );
+    }
+  }
   receive(input: unknown) {
     try {
       this.store.mail.receive(input);

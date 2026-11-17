@@ -1,3 +1,4 @@
+import { outstandingIds, expectedDateSchema } from "./model";
 import type { Database, SqlValue } from "sql.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -67,9 +68,11 @@ export class MailRepository {
       }
     );
   }
-  lines(): OutstandingLine[] {
+  lines(includeExcluded = false): OutstandingLine[] {
     return this.rows(
-      "SELECT * FROM outstanding_orders ORDER BY purchaseDate DESC,transactionId,line",
+      "SELECT * FROM outstanding_orders " +
+        (includeExcluded ? "" : "WHERE kind='item' AND deletedAt IS NULL ") +
+        "ORDER BY purchaseDate DESC,transactionId,line",
     );
   }
   ingest(
@@ -152,6 +155,39 @@ export class MailRepository {
         "INSERT INTO mail_cursors(accountId,error) VALUES(?,?) ON CONFLICT(accountId) DO UPDATE SET error=excluded.error",
         [id, message],
       );
+    });
+  }
+  private validateSelection(ids: string[]) {
+    const visible = new Set(this.lines().map((l) => l.id));
+    if (ids.some((id) => !visible.has(id))) throw Error("OUTSTANDING_MISSING");
+  }
+  setExpectedDate(input: unknown) {
+    const { ids, expectedDate } = z
+      .object({ ids: outstandingIds, expectedDate: expectedDateSchema })
+      .strict()
+      .parse(input);
+    this.tx(() => {
+      this.validateSelection(ids);
+      for (const id of ids)
+        this.db().run(
+          "UPDATE outstanding_orders SET expectedDate=? WHERE id=?",
+          [expectedDate, id],
+        );
+    });
+  }
+  deleteLines(input: unknown) {
+    const { ids } = z
+      .object({ ids: outstandingIds, confirmed: z.literal(true) })
+      .strict()
+      .parse(input);
+    this.tx(() => {
+      this.validateSelection(ids);
+      const now = new Date().toISOString();
+      for (const id of ids)
+        this.db().run("UPDATE outstanding_orders SET deletedAt=? WHERE id=?", [
+          now,
+          id,
+        ]);
     });
   }
   receive(input: unknown) {

@@ -192,3 +192,135 @@ test("additional IMAP controls verify connection, clear passwords, toggle monito
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("outstanding bulk dates, filtered selection, cancellation confirmation and persistent multi-delete", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "outstanding-bulk-ui-"));
+  const db = await Store.open(join(dir, "personal-toolbox.sqlite"));
+  db.mail.ingest(
+    "fixture",
+    [
+      {
+        transactionId: "BULKTEST000000001",
+        purchaseDate: "2026-11-16",
+        lines: [
+          ...["Alpha comic", "Beta comic", "Gamma comic"].map(
+            (description) => ({
+              description,
+              unitCents: 399,
+              quantity: 1,
+              amountCents: 399,
+              kind: "item",
+            }),
+          ),
+          {
+            description: "FOC SHIPPING - $4.95 BASE RATE",
+            unitCents: 495,
+            quantity: 1,
+            amountCents: 495,
+            kind: "shipping",
+          },
+        ],
+      },
+    ],
+    { validity: "1", lastUid: 1 },
+    { scanned: 1, skipped: 0, limited: false },
+  );
+  db.close();
+  let app = await electron.launch({ args: [".", `--user-data-dir=${dir}`] });
+  try {
+    let page = await app.firstWindow();
+    const open = async () => {
+      await page
+        .getByRole("button", { name: "Collection", exact: true })
+        .click();
+      await page.getByRole("tab", { name: /Outstanding orders/ }).click();
+    };
+    await open();
+    const panel = () => page.locator(".outstanding-orders");
+    await expect(panel().locator("tbody tr")).toHaveCount(3);
+    await expect(panel()).not.toContainText("FOC SHIPPING");
+    await page.getByLabel("Select all matching outstanding lines").check();
+    await page
+      .getByRole("button", { name: "Set expected date", exact: true })
+      .click();
+    await page
+      .getByLabel("Expected arrival date (optional)")
+      .fill("2027-01-15");
+    await page
+      .getByRole("button", { name: "Save expected date", exact: true })
+      .click();
+    await expect(
+      panel()
+        .getByRole("button", { name: /Expected arrival for/ })
+        .filter({ hasText: "2027-01-15" }),
+    ).toHaveCount(3);
+    await page.getByLabel("Select all matching outstanding lines").check();
+    await page
+      .getByRole("button", { name: "Set expected date", exact: true })
+      .click();
+    await page.getByLabel("Expected arrival date (optional)").fill("");
+    await page
+      .getByRole("button", { name: "Save expected date", exact: true })
+      .click();
+    await expect(
+      panel()
+        .getByRole("button", { name: /Expected arrival for/ })
+        .filter({ hasText: "Set date" }),
+    ).toHaveCount(3);
+    await page.getByLabel("Expected arrival for Alpha comic line 1").click();
+    await page
+      .getByLabel("Expected arrival date (optional)")
+      .fill("2027-02-10");
+    await page
+      .getByRole("button", { name: "Save expected date", exact: true })
+      .click();
+    await page.getByLabel("Select Alpha comic line 1").check();
+    await page.getByLabel("Search outstanding orders").fill("Beta");
+    await expect(
+      panel().getByText("0 selected", { exact: true }),
+    ).toBeVisible();
+    await page.getByLabel("Select all matching outstanding lines").check();
+    await page
+      .getByRole("button", { name: "Delete selected", exact: true })
+      .click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    await expect(panel().locator("tbody tr")).toHaveCount(1);
+    await page
+      .getByRole("button", { name: "Delete selected", exact: true })
+      .click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Delete line", exact: true })
+      .click();
+    await expect(panel().locator("tbody tr")).toHaveCount(0);
+    await page.getByLabel("Search outstanding orders").fill("");
+    await expect(panel().locator("tbody tr")).toHaveCount(2);
+    await app.close();
+    app = await electron.launch({ args: [".", `--user-data-dir=${dir}`] });
+    page = await app.firstWindow();
+    await open();
+    await expect(
+      page.getByLabel("Expected arrival for Alpha comic line 1"),
+    ).toHaveText("2027-02-10");
+    await page.getByLabel("Select all matching outstanding lines").check();
+    await page
+      .getByRole("button", { name: "Delete selected", exact: true })
+      .click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Delete lines", exact: true })
+      .click();
+    await expect(panel().locator("tbody tr")).toHaveCount(0);
+    await expect(panel()).not.toContainText("FOC SHIPPING");
+    await page.screenshot({
+      path: "work/outstanding-bulk.png",
+      fullPage: true,
+    });
+  } finally {
+    await app.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

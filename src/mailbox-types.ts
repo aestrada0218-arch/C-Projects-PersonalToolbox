@@ -22,6 +22,8 @@ export type MailboxAccount = {
   legacy: boolean;
 };
 export type OutstandingLine = {
+  expectedDate: string | null;
+  deletedAt: string | null;
   id: string;
   transactionId: string;
   line: number;

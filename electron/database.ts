@@ -1,5 +1,5 @@
 import { MailRepository } from "./mailboxes/store";
-import { mailMigration } from "./mailboxes/model";
+import { mailMigration, outstandingMigration } from "./mailboxes/model";
 import { CollectionRepository } from "./collection/store";
 import { collectionMigration } from "./collection/model";
 import { ShippingRepository } from "./shipping/store";
@@ -90,7 +90,7 @@ export class Store {
     const version =
       this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
     // v0.7 only added separate entry tables; retain them when rolling back.
-    if (Number(version) > 9) throw new Error("Unsupported database version");
+    if (Number(version) > 10) throw new Error("Unsupported database version");
     if (Number(version) < 1) {
       this.db.run(
         `BEGIN; CREATE TABLE orders(id TEXT PRIMARY KEY,name TEXT NOT NULL,store TEXT NOT NULL,category TEXT NOT NULL,total REAL NOT NULL CHECK(total>=0),status TEXT NOT NULL CHECK(status IN ('Delivered','In transit','Processing','Cancelled')),date TEXT NOT NULL); CREATE TABLE collection(id TEXT PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),purchase REAL NOT NULL,market REAL NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO migrations VALUES(1);`,
@@ -211,6 +211,23 @@ export class Store {
         });
       this.db.run(
         "BEGIN;" + mailMigration + "INSERT INTO migrations VALUES(9);COMMIT;",
+      );
+      this.persist();
+    }
+    if (Number(version) < 10) {
+      if (
+        this.path &&
+        Number(version) > 0 &&
+        !existsSync(this.path + ".pre-outstanding-v9.bak")
+      )
+        writeFileSync(this.path + ".pre-outstanding-v9.bak", this.db.export(), {
+          flag: "wx",
+          mode: 0o600,
+        });
+      this.db.run(
+        "BEGIN;" +
+          outstandingMigration +
+          "INSERT INTO migrations VALUES(10);COMMIT;",
       );
       this.persist();
     }

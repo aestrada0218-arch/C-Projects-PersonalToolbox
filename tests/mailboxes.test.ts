@@ -207,8 +207,10 @@ describe("Outstanding persistence", () => {
         { validity: "1", lastUid: 1 },
         { scanned: 1, skipped: 0, limited: false },
       );
-      expect(store.mail.lines()).toHaveLength(3);
-      const shipping = store.mail.lines().find((l) => l.kind === "shipping")!;
+      expect(store.mail.lines()).toHaveLength(2);
+      const shipping = store.mail
+        .lines(true)
+        .find((l) => l.kind === "shipping")!;
       expect(() =>
         store.mail.receive({
           ...input,
@@ -302,7 +304,7 @@ describe("Multiple IMAP accounts", () => {
         await idle(service);
       }
       expect(service.state().accounts).toHaveLength(12);
-      expect(service.state().outstanding).toHaveLength(3);
+      expect(service.state().outstanding).toHaveLength(2);
       expect(vaults.size).toBe(12);
       expect(JSON.stringify(service.state())).not.toContain("never-persist");
       expect(
@@ -311,7 +313,7 @@ describe("Multiple IMAP accounts", () => {
       const id = service.state().accounts[0].id;
       expect((await service.disconnect(id)).ok).toBe(true);
       expect(await getVault(id).read()).toBeNull();
-      expect(service.state().outstanding).toHaveLength(3);
+      expect(service.state().outstanding).toHaveLength(2);
       expect(scan).toHaveBeenCalledTimes(12);
       expect(sales).toHaveBeenCalledTimes(12);
     } finally {
@@ -386,7 +388,7 @@ it("isolates failing accounts so a failed IMAP login does not prevent other rece
   try {
     const result = await service.refresh();
     expect(result.ok).toBe(false);
-    expect(result.state.outstanding).toHaveLength(3);
+    expect(result.state.outstanding).toHaveLength(2);
     expect(result.state.accounts.find((a) => a.id === ids[0])?.error).toContain(
       "secure mailbox scan",
     );
@@ -620,7 +622,7 @@ it("imports outstanding receipts without invoking an unrelated failing sales sca
   try {
     const result = await service.refresh(undefined, false, true);
     expect(result.ok).toBe(true);
-    expect(result.state.outstanding).toHaveLength(3);
+    expect(result.state.outstanding).toHaveLength(2);
     expect(sales).not.toHaveBeenCalled();
   } finally {
     service.stop();
@@ -643,4 +645,109 @@ it("provides actionable fixed errors without exposing server text or passwords",
   expect(scanError(Error("private IMAP diagnostic"), "sales")).not.toContain(
     "private",
   );
+});
+
+it("saves and clears optional dates in bulk, rejects invalid dates and keeps updates atomic", async () => {
+  const db = await Store.open();
+  try {
+    const receipt = parseMinkysReceipt(await mail())!;
+    db.mail.ingest(
+      "test",
+      [receipt],
+      { validity: "1", lastUid: 1 },
+      { scanned: 1, skipped: 0, limited: false },
+    );
+    const ids = db.mail.lines().map((l) => l.id);
+    expect(ids).toHaveLength(2);
+    expect(db.mail.lines(true)).toHaveLength(3);
+    db.mail.setExpectedDate({ ids, expectedDate: "2027-01-15" });
+    expect(db.mail.lines().every((l) => l.expectedDate === "2027-01-15")).toBe(
+      true,
+    );
+    for (const date of ["2026-02-30", "2027-13-01", "not-a-date"])
+      expect(() =>
+        db.mail.setExpectedDate({ ids, expectedDate: date }),
+      ).toThrow();
+    expect(() =>
+      db.mail.setExpectedDate({
+        ids: [ids[0], randomUUID()],
+        expectedDate: "2027-02-01",
+      }),
+    ).toThrow();
+    expect(db.mail.lines().every((l) => l.expectedDate === "2027-01-15")).toBe(
+      true,
+    );
+    expect(() =>
+      db.mail.setExpectedDate({ ids: [ids[0], ids[0]], expectedDate: null }),
+    ).toThrow();
+    db.mail.ingest(
+      "other-inbox",
+      [receipt],
+      { validity: "2", lastUid: 10 },
+      { scanned: 1, skipped: 0, limited: false },
+    );
+    expect(db.mail.lines().every((l) => l.expectedDate === "2027-01-15")).toBe(
+      true,
+    );
+    db.mail.setExpectedDate({ ids, expectedDate: null });
+    expect(db.mail.lines().every((l) => l.expectedDate === null)).toBe(true);
+  } finally {
+    db.close();
+  }
+});
+it("deletes selected lines without losing received collection items or recreating cancelled lines on import", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "outstanding-delete-")),
+    file = join(dir, "test.sqlite");
+  let db = await Store.open(file);
+  try {
+    const receipt = parseMinkysReceipt(await mail())!;
+    db.mail.ingest(
+      "test",
+      [receipt],
+      { validity: "1", lastUid: 1 },
+      { scanned: 1, skipped: 0, limited: false },
+    );
+    const lines = db.mail.lines(),
+      ids = lines.map((l) => l.id);
+    const itemId = db.mail.receive({
+      id: ids[0],
+      quantity: 1,
+      tab: "comics",
+      requestId: randomUUID(),
+    });
+    db.mail.setExpectedDate({ ids, expectedDate: "2027-01-15" });
+    expect(() => db.mail.deleteLines({ ids, confirmed: false })).toThrow();
+    expect(() =>
+      db.mail.deleteLines({ ids: [ids[0], randomUUID()], confirmed: true }),
+    ).toThrow();
+    expect(db.mail.lines()).toHaveLength(2);
+    db.close();
+    db = await Store.open(file);
+    expect(db.mail.lines().every((l) => l.expectedDate === "2027-01-15")).toBe(
+      true,
+    );
+    db.mail.deleteLines({ ids, confirmed: true });
+    expect(db.mail.lines()).toHaveLength(0);
+    expect(db.collection.items().find((i) => i.id === itemId)?.quantity).toBe(
+      1,
+    );
+    db.close();
+    db = await Store.open(file);
+    expect(
+      db.mail.ingest(
+        "other-inbox",
+        [receipt],
+        { validity: "2", lastUid: 1 },
+        { scanned: 1, skipped: 0, limited: false },
+      ),
+    ).toBe(0);
+    expect(db.mail.lines()).toHaveLength(0);
+    expect(db.mail.lines(true).filter((l) => l.deletedAt)).toHaveLength(2);
+    expect(() =>
+      db.mail.setExpectedDate({ ids, expectedDate: null }),
+    ).toThrow();
+  } finally {
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

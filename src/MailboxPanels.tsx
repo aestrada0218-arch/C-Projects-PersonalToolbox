@@ -456,14 +456,38 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
     [showReceived, setShowReceived] = useState(false),
     [selected, setSelected] = useState<OutstandingLine | null>(null),
     requestId = useRef("");
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [edit, setEdit] = useState<{
+    kind: "date" | "delete";
+    ids: string[];
+    date?: string;
+  } | null>(null);
+  const selectAll = useRef<HTMLInputElement>(null);
   const items = state.outstanding.filter(
     (l) =>
+      l.kind === "item" &&
       (showReceived || l.receivedQty < l.quantity) &&
       [l.description, l.transactionId, l.purchaseDate]
         .join(" ")
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
+  const selectedIds = items.filter((l) => checked.has(l.id)).map((l) => l.id);
+  useEffect(() => {
+    if (selectAll.current)
+      selectAll.current.indeterminate =
+        selectedIds.length > 0 && selectedIds.length < items.length;
+  }, [selectedIds.length, items.length]);
+  const openDate = (ids: string[]) => {
+    const values = new Set(
+      items.filter((l) => ids.includes(l.id)).map((l) => l.expectedDate || ""),
+    );
+    setEdit({
+      kind: "date",
+      ids,
+      date: values.size === 1 ? [...values][0] : "",
+    });
+  };
   return (
     <section className="panel outstanding-orders">
       <div className="panel-heading">
@@ -511,8 +535,8 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
         Matches service@paypal.com and Payment to Minky’s Designs /
         Minkysdesigns@gmail.com. Purchase date, line amounts and transaction
         references are retained. Email alone does not confirm shipping status;
-        received items move only when you confirm arrival. Shipping charges
-        remain separate.
+        received items move only when you confirm arrival. FOC shipping and
+        other shipping-charge lines are excluded.
       </p>
       <div className="table-toolbar">
         <label className="search">
@@ -520,24 +544,76 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
             aria-label="Search outstanding orders"
             placeholder="Description, transaction or date…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setChecked(new Set());
+            }}
           />
         </label>
         <label className="mail-toggle">
           <input
             type="checkbox"
             checked={showReceived}
-            onChange={(e) => setShowReceived(e.target.checked)}
+            onChange={(e) => {
+              setShowReceived(e.target.checked);
+              setChecked(new Set());
+            }}
           />
           Include received items
         </label>
+      </div>
+      <div
+        className="outstanding-bulk"
+        aria-label="Outstanding order bulk actions"
+      >
+        <span>{selectedIds.length} selected</span>
+        <button
+          disabled={busy || !selectedIds.length}
+          onClick={() => openDate(selectedIds)}
+        >
+          Set expected date
+        </button>
+        <button
+          className="danger-button"
+          disabled={busy || !selectedIds.length}
+          onClick={() => setEdit({ kind: "delete", ids: selectedIds })}
+        >
+          <Trash2 size={14} />
+          Delete selected
+        </button>
+        {selectedIds.length > 0 && (
+          <button
+            className="text-button"
+            disabled={busy}
+            onClick={() => setChecked(new Set())}
+          >
+            Clear selection
+          </button>
+        )}
       </div>
       <div className="table-scroll">
         <table>
           <thead>
             <tr>
+              <th>
+                <input
+                  ref={selectAll}
+                  type="checkbox"
+                  aria-label="Select all matching outstanding lines"
+                  disabled={busy || !items.length}
+                  checked={
+                    items.length > 0 && selectedIds.length === items.length
+                  }
+                  onChange={(e) =>
+                    setChecked(
+                      new Set(e.target.checked ? items.map((l) => l.id) : []),
+                    )
+                  }
+                />
+              </th>
               <th>DESCRIPTION / TRANSACTION</th>
               <th>PURCHASED</th>
+              <th>EXPECTED ARRIVAL</th>
               <th>UNIT PRICE</th>
               <th>QTY</th>
               <th>AMOUNT</th>
@@ -547,7 +623,28 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
           </thead>
           <tbody>
             {items.map((l) => (
-              <tr key={l.id}>
+              <tr
+                key={l.id}
+                className={
+                  checked.has(l.id) ? "outstanding-selected" : undefined
+                }
+              >
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={
+                      "Select " + l.description + " line " + (l.line + 1)
+                    }
+                    disabled={busy}
+                    checked={checked.has(l.id)}
+                    onChange={(e) => {
+                      const next = new Set(checked);
+                      if (e.target.checked) next.add(l.id);
+                      else next.delete(l.id);
+                      setChecked(next);
+                    }}
+                  />
+                </td>
                 <td>
                   <strong>{l.description}</strong>
                   <small>
@@ -556,6 +653,21 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
                   </small>
                 </td>
                 <td>{l.purchaseDate}</td>
+                <td>
+                  <button
+                    className="text-button"
+                    disabled={busy}
+                    aria-label={
+                      "Expected arrival for " +
+                      l.description +
+                      " line " +
+                      (l.line + 1)
+                    }
+                    onClick={() => openDate([l.id])}
+                  >
+                    {l.expectedDate || "Set date"}
+                  </button>
+                </td>
                 <td>{money(l.unitCents)}</td>
                 <td>{l.quantity}</td>
                 <td>{money(l.amountCents)}</td>
@@ -565,27 +677,42 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
                     : `${l.receivedQty} / ${l.quantity}`}
                 </td>
                 <td>
-                  {l.kind === "item" && l.receivedQty < l.quantity ? (
+                  <div className="outstanding-row-actions">
+                    {l.kind === "item" && l.receivedQty < l.quantity ? (
+                      <button
+                        disabled={busy}
+                        aria-label={
+                          "Receive " + l.description + " line " + (l.line + 1)
+                        }
+                        onClick={() => {
+                          requestId.current = crypto.randomUUID();
+                          setSelected(l);
+                        }}
+                      >
+                        <PackageCheck size={14} />
+                        Receive / move
+                      </button>
+                    ) : (
+                      <span>
+                        {l.kind === "shipping"
+                          ? "Excluded from collection"
+                          : "Received"}
+                      </span>
+                    )}
                     <button
+                      className="text-button danger-button"
                       disabled={busy}
                       aria-label={
-                        "Receive " + l.description + " line " + (l.line + 1)
+                        "Delete outstanding " +
+                        l.description +
+                        " line " +
+                        (l.line + 1)
                       }
-                      onClick={() => {
-                        requestId.current = crypto.randomUUID();
-                        setSelected(l);
-                      }}
+                      onClick={() => setEdit({ kind: "delete", ids: [l.id] })}
                     >
-                      <PackageCheck size={14} />
-                      Receive / move
+                      <Trash2 size={15} />
                     </button>
-                  ) : (
-                    <span>
-                      {l.kind === "shipping"
-                        ? "Excluded from collection"
-                        : "Received"}
-                    </span>
-                  )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -667,6 +794,106 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
               </div>
             </fieldset>
           </form>
+        </Dialog>
+      )}
+      {edit && (
+        <Dialog
+          title={
+            edit.kind === "date"
+              ? "Expected arrival date"
+              : edit.ids.length === 1
+                ? "Delete outstanding line?"
+                : "Delete selected outstanding lines?"
+          }
+          busy={busy}
+          onClose={() => setEdit(null)}
+        >
+          <p>
+            {edit.ids.length} {edit.ids.length === 1 ? "line" : "lines"}{" "}
+            selected.
+          </p>
+          {edit.kind === "date" ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const date = String(
+                  new FormData(e.currentTarget).get("expectedDate") || "",
+                );
+                void action(
+                  () =>
+                    window.toolbox!.setOutstandingExpectedDate({
+                      ids: edit.ids,
+                      expectedDate: date || null,
+                    }),
+                  date
+                    ? "Expected arrival date saved."
+                    : "Expected arrival date cleared.",
+                ).then((ok) => {
+                  if (ok) {
+                    setEdit(null);
+                    setChecked(new Set());
+                  }
+                });
+              }}
+            >
+              <fieldset disabled={busy}>
+                <label>
+                  Expected arrival date (optional)
+                  <input
+                    name="expectedDate"
+                    type="date"
+                    defaultValue={edit.date || ""}
+                  />
+                </label>
+                <p className="mail-note">
+                  Leave blank to clear the date. This changes only your expected
+                  arrival estimate, not the purchase date or received quantity.
+                </p>
+                {error && <p role="alert">{error}</p>}
+                <div className="modal-actions">
+                  <button type="button" onClick={() => setEdit(null)}>
+                    Cancel
+                  </button>
+                  <button className="primary">Save expected date</button>
+                </div>
+              </fieldset>
+            </form>
+          ) : (
+            <>
+              <p>
+                Remove these lines from Outstanding Orders? Deleted lines will
+                stay excluded when emails are scanned again. Any items already
+                received into your collection will stay there.
+              </p>
+              {error && <p role="alert">{error}</p>}
+              <div className="modal-actions">
+                <button disabled={busy} onClick={() => setEdit(null)}>
+                  Cancel
+                </button>
+                <button
+                  className="danger-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void action(
+                      () =>
+                        window.toolbox!.deleteOutstandingLines({
+                          ids: edit.ids,
+                          confirmed: true,
+                        }),
+                      "Outstanding lines deleted. They will not be re-imported.",
+                    ).then((ok) => {
+                      if (ok) {
+                        setEdit(null);
+                        setChecked(new Set());
+                      }
+                    })
+                  }
+                >
+                  {edit.ids.length === 1 ? "Delete line" : "Delete lines"}
+                </button>
+              </div>
+            </>
+          )}
         </Dialog>
       )}
     </section>
