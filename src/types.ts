@@ -68,6 +68,7 @@ export interface ToolboxAPI {
     id: string;
     enabled: boolean;
   }): Promise<MailboxResult>;
+  scanOutstanding(): Promise<MailboxResult>;
   scanMailboxes(id?: string): Promise<MailboxResult>;
   receiveOutstanding(input: {
     requestId: string;

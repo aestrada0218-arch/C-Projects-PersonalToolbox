@@ -45,6 +45,11 @@ test("real IPC: delete order, receive outstanding items into collection, retain 
   let app = await electron.launch({ args: [".", `--user-data-dir=${dir}`] });
   try {
     let page = await app.firstWindow();
+    expect(
+      await page.evaluate(
+        async () => (await window.toolbox!.scanOutstanding()).error,
+      ),
+    ).toContain("Connect an inbox first.");
     await expect(
       page.getByRole("button", { name: "Proxies", exact: true }),
     ).toHaveCount(0);

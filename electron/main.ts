@@ -124,6 +124,9 @@ else {
       handle("toolbox:mailboxes-enabled", (input) =>
         mailboxes.setEnabled(input),
       );
+      handle("toolbox:outstanding-scan", () =>
+        mailboxes.refresh(undefined, false, true),
+      );
       handle("toolbox:mailboxes-scan", (id) => mailboxes.refresh(id));
       handle("toolbox:outstanding-receive", (input) =>
         mailboxes.receive(input),

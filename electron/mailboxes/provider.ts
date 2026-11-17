@@ -55,6 +55,7 @@ export class ReceiptProvider {
   ): Promise<ReceiptScan> {
     const c = this.client(secret),
       timer = setTimeout(() => c.close(), 120000);
+    const softDeadline = Date.now() + 75000;
     try {
       await c.connect();
       let folder = secret.folder || "INBOX";
@@ -91,6 +92,13 @@ export class ReceiptProvider {
           limited: ids.length > 100,
         };
         for (const uid of ids.slice(0, 100)) {
+          if (
+            result.scanned + result.skipped > 0 &&
+            Date.now() >= softDeadline
+          ) {
+            result.limited = true;
+            break;
+          }
           const meta = await c.fetchOne(uid, { size: true }, { uid: true });
           if (!meta || !meta.size || meta.size > 2 * 1024 * 1024) {
             result.skipped++;

@@ -1,4 +1,4 @@
-# Personal Toolbox · v0.8.0
+# Personal Toolbox · v0.8.1
 
 A Windows desktop app built with Electron, React, TypeScript, Vite, Tailwind CSS, SQLite (sql.js), Recharts, and Playwright. Original dark-and-gold interface. Version 0.6 adds direct eBay fixed-price selling, shared drafts, exact Mercari listing links, and persistent cross-listing follow-ups. Version 0.5 added eBay-email shipping tasks with ship-by dates and scheduled Gmail checks. Version 0.4.1 added illustrated card search and full-title matching. Version 0.4 added a multi-section collection, JustTCG catalog/pricing, saved quote history, and an isolated interactive TCGplayer catalog browser. The categorized expense ledger and recurring bookkeeping remain available.
 
@@ -297,3 +297,11 @@ npm run dev
 The database migration creates a `.pre-mailboxes-v8.bak` backup and retains existing orders, expenses, collection, mailbox settings and any unused v0.7 entry tables. It adds mailbox metadata, receipt cursors, outstanding lines, move receipts and collection purchase dates. Do not restore an older backup merely to update.
 
 Run `npm run build`, `npm test` and `npm run test:e2e` to validate. New tests cover the screenshot's line items, HTML receipts, exact sender/payee filtering, 365-day IMAP queries, bounded cursor progression, cross-inbox deduplication, 12 separate mailbox credentials, partial/idempotent receiving, order deletion/unlinking, persistence and desktop controls. IMAP and credential tests use mocks; Windows Credential Manager and real provider authentication require verification on your computer.
+
+### v0.8.1 — receipt scan reliability
+
+Outstanding Orders now requests a receipt-only scan. An unrelated shipment/eBay scan cannot turn a successful receipt import into a receipt-scan failure. Full Inbox scans retain their existing shipment and sales checks.
+
+The per-inbox sales scanner now inherits the previous primary account's saved sales cursor, preventing an upgrade from replaying an older batch behind the existing sales monitor. Cursors from other accounts are never reused. Long receipt batches return completed progress before the hard timeout so a slower mailbox can continue in later batches. No database reset is required.
+
+Failures now identify the inbox and scan stage, with fixed guidance for missing credentials, rejected sign-in, certificate verification, network timeouts, unavailable folders and local storage. Initial primary-account errors are persisted even before a successful first scan. Raw IMAP responses, command text, mail contents and credentials are not exposed. If scanning still fails after updating, use the new error text to determine the next step; live Gmail authentication cannot be verified from development fixtures.

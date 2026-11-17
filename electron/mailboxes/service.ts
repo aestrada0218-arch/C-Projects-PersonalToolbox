@@ -1,3 +1,4 @@
+import { scanError, type ScanPhase } from "./errors";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Store } from "../database";
@@ -169,7 +170,7 @@ export class MailboxService {
       );
     }
   }
-  async refresh(input?: unknown, automatic = false) {
+  async refresh(input?: unknown, automatic = false, receiptsOnly = false) {
     if (this.busy || this.stopped)
       return this.result(
         "A mailbox operation is already running or the application is closing.",
@@ -181,10 +182,11 @@ export class MailboxService {
     const accounts = this.state().accounts.filter((a) => !id || a.id === id);
     if (!accounts.length) return this.result("Connect an inbox first.");
     this.busy = true;
-    let failures = 0;
+    const failures: string[] = [];
     try {
       for (const account of accounts) {
         if (this.stopped) break;
+        let phase: ScanPhase = "credentials";
         try {
           const secret = await (
             account.legacy ? this.primary : this.vault(account.id)
@@ -201,16 +203,30 @@ export class MailboxService {
           const cursorId = account.legacy
             ? "legacy:" + account.email
             : account.id;
-          const cursor = this.store.mail.cursor(cursorId),
-            scan = await this.receipts.scan(secret, cursor);
+          const cursor = this.store.mail.cursor(cursorId);
+          phase = "receipts";
+          const scan = await this.receipts.scan(secret, cursor);
           if (this.stopped) break;
+          phase = "storage";
           this.store.mail.ingest(cursorId, scan.receipts, scan.cursor, scan);
+          if (
+            account.legacy &&
+            this.store.inboxAccount()?.error ===
+              "Could not complete the PayPal or sales scan. Check Gmail credentials and connectivity."
+          )
+            this.store.setInboxError("");
           if (scan.limited) this.backfills.add(account.id);
           else this.backfills.delete(account.id);
+          if (receiptsOnly) {
+            this.retryAt.delete(account.id);
+            continue;
+          }
           this.active = new GmailImapProvider();
           if (!account.legacy) {
+            phase = "shipments";
             const messages = await this.active.scan(secret);
             if (this.stopped) break;
+            phase = "storage";
             this.store.recordInboxScan(messages);
           }
           if (
@@ -219,11 +235,23 @@ export class MailboxService {
               !cursor.salesNext ||
               Date.parse(cursor.salesNext) <= Date.now())
           ) {
-            const sales = await this.active.scanSales(secret, {
+            phase = "sales";
+            const existing = this.store.shipping.cursorForAccount(
+              account.email,
+            );
+            const saved = {
               uidValidity: cursor.salesValidity || null,
               lastUid: cursor.salesUid || 0,
-            });
+            };
+            const salesCursor = !saved.uidValidity
+              ? existing
+              : existing.uidValidity === saved.uidValidity &&
+                  existing.lastUid > saved.lastUid
+                ? existing
+                : saved;
+            const sales = await this.active.scanSales(secret, salesCursor);
             if (this.stopped) break;
+            phase = "storage";
             this.store.shipping.ingest(account.email, sales);
             this.store.mail.salesCursor(
               cursorId,
@@ -238,16 +266,18 @@ export class MailboxService {
             );
           }
           this.retryAt.delete(account.id);
-        } catch {
-          failures++;
+        } catch (error) {
+          const message = scanError(error, phase);
+          failures.push(account.label + ": " + message);
           if (!this.stopped) {
-            this.store.mail.error(
-              account.legacy ? "legacy:" + account.email : account.id,
-            );
-            if (account.legacy)
-              this.store.setInboxError(
-                "Could not complete the PayPal or sales scan. Check Gmail credentials and connectivity.",
+            try {
+              this.store.mail.error(
+                account.legacy ? "legacy:" + account.email : account.id,
+                message,
               );
+            } catch {
+              /* storage itself may be unavailable */
+            }
           }
           this.retryAt.set(account.id, Date.now() + 10 * 60000);
         } finally {
@@ -258,11 +288,7 @@ export class MailboxService {
     } finally {
       this.busy = false;
     }
-    return this.result(
-      failures
-        ? `${failures} inbox scan(s) could not finish. Other inboxes were processed; saved purchases were retained.`
-        : undefined,
-    );
+    return this.result(failures.length ? failures.join(" ") : undefined);
   }
   start() {
     this.timer = setInterval(() => void this.tick(), 60000);

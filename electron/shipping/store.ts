@@ -56,6 +56,14 @@ export class ShippingRepository {
     )[0];
     return { uidValidity: row.uidValidity, lastUid: row.lastUid };
   }
+  cursorForAccount(email: string): SalesCursor {
+    const row = this.rows(
+      "SELECT accountHash,uidValidity,lastUid FROM shipping_monitor WHERE id=1",
+    )[0];
+    return row.accountHash === accountHash(email)
+      ? { uidValidity: row.uidValidity, lastUid: row.lastUid }
+      : { uidValidity: null, lastUid: 0 };
+  }
   // These two methods participate in Store's existing account transaction.
   bindAccountInTransaction(email: string) {
     const hash = accountHash(email);

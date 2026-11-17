@@ -91,3 +91,23 @@ it("uses the exact custom TLS endpoint/folder and does not silently skip a trans
   });
   expect(client.list).not.toHaveBeenCalled();
 });
+it("returns completed progress before a slow batch reaches its hard timeout", async () => {
+  const now = Date.now();
+  let elapsed = 0;
+  const clock = vi.spyOn(Date, "now").mockImplementation(() => now + elapsed);
+  client.search.mockResolvedValue([1, 2, 3]);
+  client.fetchOne.mockImplementation(async () => {
+    elapsed += 40000;
+    return { size: 3 * 1024 * 1024 };
+  });
+  try {
+    const result = await new ReceiptProvider().scan(secret, {
+      validity: null,
+      lastUid: 0,
+    });
+    expect(result.cursor.lastUid).toBe(2);
+    expect(result.limited).toBe(true);
+  } finally {
+    clock.mockRestore();
+  }
+});

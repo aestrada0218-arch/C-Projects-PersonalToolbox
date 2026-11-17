@@ -539,3 +539,108 @@ it("keeps primary Gmail sales monitoring active when shipment auto-check is off"
     db.close();
   }
 });
+it("hands off an existing primary sales cursor when upgrading to per-inbox scanning", async () => {
+  const db = await Store.open();
+  db.connectInbox("primary@gmail.com", empty);
+  db.shipping.ingest("primary@gmail.com", {
+    sales: [],
+    scanned: 0,
+    skipped: 0,
+    limited: false,
+    cursor: { uidValidity: "1", lastUid: 900 },
+  });
+  const sales = vi
+      .spyOn(GmailImapProvider.prototype, "scanSales")
+      .mockImplementation(async (_secret, cursor) => {
+        expect(cursor).toEqual({ uidValidity: "1", lastUid: 900 });
+        return {
+          sales: [],
+          scanned: 0,
+          skipped: 0,
+          limited: false,
+          cursor: { uidValidity: "1", lastUid: 901 },
+        };
+      }),
+    provider = {
+      test: async () => {},
+      cancel: () => {},
+      scan: async () => ({
+        receipts: [],
+        cursor: { validity: "1", lastUid: 0 },
+        scanned: 0,
+        skipped: 0,
+        limited: false,
+      }),
+    } as unknown as ReceiptProvider,
+    service = new MailboxService(
+      db,
+      vault<MailSecret>({ email: "primary@gmail.com", appPassword: "private" }),
+      () => vault(),
+      provider,
+      true,
+    );
+  try {
+    expect((await service.refresh()).ok).toBe(true);
+    expect(db.mail.cursor("legacy:primary@gmail.com").salesUid).toBe(901);
+    expect(db.shipping.cursorForAccount("other@gmail.com")).toEqual({
+      uidValidity: null,
+      lastUid: 0,
+    });
+  } finally {
+    service.stop();
+    sales.mockRestore();
+    db.close();
+  }
+});
+it("imports outstanding receipts without invoking an unrelated failing sales scan", async () => {
+  const db = await Store.open();
+  db.connectInbox("primary@gmail.com", empty);
+  const sales = vi
+      .spyOn(GmailImapProvider.prototype, "scanSales")
+      .mockRejectedValue(Error("private unrelated failure")),
+    receipt = parseMinkysReceipt(await mail())!,
+    provider = {
+      test: async () => {},
+      cancel: () => {},
+      scan: async () => ({
+        receipts: [receipt],
+        cursor: { validity: "1", lastUid: 1 },
+        scanned: 1,
+        skipped: 0,
+        limited: false,
+      }),
+    } as unknown as ReceiptProvider,
+    service = new MailboxService(
+      db,
+      vault<MailSecret>({ email: "primary@gmail.com", appPassword: "private" }),
+      () => vault(),
+      provider,
+      true,
+    );
+  try {
+    const result = await service.refresh(undefined, false, true);
+    expect(result.ok).toBe(true);
+    expect(result.state.outstanding).toHaveLength(3);
+    expect(sales).not.toHaveBeenCalled();
+  } finally {
+    service.stop();
+    sales.mockRestore();
+    db.close();
+  }
+});
+import { scanError } from "../electron/mailboxes/errors";
+it("provides actionable fixed errors without exposing server text or passwords", () => {
+  expect(
+    scanError(
+      { authenticationFailed: true, message: "password=private" },
+      "receipts",
+    ),
+  ).toContain("app password");
+  expect(scanError({ code: "ETIMEDOUT" }, "receipts")).toContain("timed out");
+  expect(
+    scanError({ serverResponseCode: "NONEXISTENT" }, "receipts"),
+  ).toContain("folder");
+  expect(scanError(Error("private IMAP diagnostic"), "sales")).not.toContain(
+    "private",
+  );
+});

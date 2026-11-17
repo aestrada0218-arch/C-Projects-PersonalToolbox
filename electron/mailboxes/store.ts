@@ -142,15 +142,16 @@ export class MailRepository {
   resetSalesSchedule() {
     this.tx(() => this.db().run("UPDATE mail_cursors SET salesNext=NULL"));
   }
-  error(id: string) {
+  error(
+    id: string,
+    message = "Could not complete a secure mailbox scan. Check credentials, IMAP settings and your connection.",
+  ) {
     this.tx(() => {
-      const message =
-        "Could not complete a secure mailbox scan. Check credentials, IMAP settings and your connection.";
       this.db().run("UPDATE mailboxes SET error=? WHERE id=?", [message, id]);
-      this.db().run("UPDATE mail_cursors SET error=? WHERE accountId=?", [
-        message,
-        id,
-      ]);
+      this.db().run(
+        "INSERT INTO mail_cursors(accountId,error) VALUES(?,?) ON CONFLICT(accountId) DO UPDATE SET error=excluded.error",
+        [id, message],
+      );
     });
   }
   receive(input: unknown) {

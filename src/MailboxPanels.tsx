@@ -488,7 +488,7 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
           disabled={busy || !state.accounts.length}
           onClick={() =>
             void action(
-              () => window.toolbox!.scanMailboxes(),
+              () => window.toolbox!.scanOutstanding(),
               "Receipt scan finished. More history is processed in subsequent batches.",
             )
           }

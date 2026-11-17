@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "toolbox",
   Object.freeze({
+    scanOutstanding: () => ipcRenderer.invoke("toolbox:outstanding-scan"),
     mailboxState: () => ipcRenderer.invoke("toolbox:mailboxes-state"),
     connectMailbox: (input: unknown) =>
       ipcRenderer.invoke("toolbox:mailboxes-connect", input),
