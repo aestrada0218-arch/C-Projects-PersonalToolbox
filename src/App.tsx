@@ -1,3 +1,4 @@
+import CompanionSettings from "./CompanionSettings";
 import CollectionPanel from "./CollectionPanel";
 import SellingPanel from "./SellingPanel";
 import TasksPanel from "./TasksPanel";
@@ -255,7 +256,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.8.2</span>
+            <span>v0.9.0</span>
           </div>
         </div>
       </aside>
@@ -725,19 +726,23 @@ export default function App() {
               {page === "Inbox" && (
                 <InboxPanel orders={data.orders} onOrdersChanged={reload} />
               )}
-              {plans[page] && (
-                <section className="panel planned">
-                  <span className="planned-icon">
-                    <BriefcaseBusiness size={28} />
-                  </span>
-                  <span className="stage-label">COMING IN A LATER STAGE</span>
-                  <h2>{page}, thoughtfully connected.</h2>
-                  <p>{plans[page]}</p>
-                  <div className="scope-note">
-                    Stage 1 establishes the secure desktop shell, local
-                    database, and analytics. This module is not active yet.
-                  </div>
-                </section>
+              {page === "Settings" ? (
+                <CompanionSettings />
+              ) : (
+                plans[page] && (
+                  <section className="panel planned">
+                    <span className="planned-icon">
+                      <BriefcaseBusiness size={28} />
+                    </span>
+                    <span className="stage-label">COMING IN A LATER STAGE</span>
+                    <h2>{page}, thoughtfully connected.</h2>
+                    <p>{plans[page]}</p>
+                    <div className="scope-note">
+                      Stage 1 establishes the secure desktop shell, local
+                      database, and analytics. This module is not active yet.
+                    </div>
+                  </section>
+                )
               )}
             </>
           )}
@@ -748,7 +753,7 @@ export default function App() {
                 ? "Local database connected"
                 : "Desktop connection required"}
             </span>
-            <span>v0.8.2 · Sample data included.</span>
+            <span>v0.9.0 · Sample data included.</span>
           </footer>
         </main>
       </div>

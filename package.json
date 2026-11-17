@@ -1,17 +1,18 @@
 {
   "name": "personal-toolbox",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "private": true,
   "main": "dist-electron/electron/main.js",
   "scripts": {
-    "dev": "npm run build:electron && concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron . --dev\"",
+    "dev": "npm run build:mobile && npm run build:electron && concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron . --dev\"",
     "build:electron": "tsc -p tsconfig.electron.json",
     "build": "tsc --noEmit && npm run build:electron && vite build",
     "start": "electron .",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "dist:win": "npm run build && electron-builder --win nsis",
-    "format": "prettier --write src electron tests *.ts *.json *.cjs README.md index.html"
+    "format": "prettier --write src electron tests *.ts *.json *.cjs README.md index.html",
+    "build:mobile": "vite build"
   },
   "dependencies": {
     "html-to-text": "^10.0.1",

@@ -2,6 +2,13 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "toolbox",
   Object.freeze({
+    companionStatus: () => ipcRenderer.invoke("toolbox:companion-status"),
+    startCompanion: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:companion-start", input),
+    stopCompanion: () => ipcRenderer.invoke("toolbox:companion-stop"),
+    rotateCompanionCode: () => ipcRenderer.invoke("toolbox:companion-pair"),
+    revokeCompanionDevice: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:companion-revoke", id),
     setOutstandingExpectedDate: (input: unknown) =>
       ipcRenderer.invoke("toolbox:outstanding-date", input),
     deleteOutstandingLines: (input: unknown) =>

@@ -1,4 +1,4 @@
-# Personal Toolbox · v0.8.2
+# Personal Toolbox · v0.9.0
 
 A Windows desktop app built with Electron, React, TypeScript, Vite, Tailwind CSS, SQLite (sql.js), Recharts, and Playwright. Original dark-and-gold interface. Version 0.6 adds direct eBay fixed-price selling, shared drafts, exact Mercari listing links, and persistent cross-listing follow-ups. Version 0.5 added eBay-email shipping tasks with ship-by dates and scheduled Gmail checks. Version 0.4.1 added illustrated card search and full-title matching. Version 0.4 added a multi-section collection, JustTCG catalog/pricing, saved quote history, and an isolated interactive TCGplayer catalog browser. The categorized expense ledger and recurring bookkeeping remain available.
 
@@ -317,3 +317,13 @@ Use row checkboxes or the header checkbox to select matching visible lines, then
 Deletion requires confirmation and applies only to the outstanding line. Any items already moved into collection remain there. A retained deletion marker prevents the same PayPal transaction/line from returning on a later scan or through another inbox. The row trash button supports single-line deletion as well.
 
 The schema-10 migration adds expected-arrival dates and deletion markers and creates a `.pre-outstanding-v9.bak` backup before changing an existing database. Existing receipts, scan progress, collection items and credentials are preserved. Tests cover v9 upgrades, real/invalid dates, date clearing, bulk selection, cancellation, persistence, no re-import after deletion and preservation of already-received items.
+
+## v0.9 — private iPhone companion
+
+A separate mobile React interface is now included alongside the Electron renderer. It reads collection, outstanding purchases, expenses and shipment tasks from the Windows app, and supports expected-arrival edits, receiving items and updating task status. It uses the same Store in the desktop process, so successful changes persist immediately in the existing SQLite database.
+
+See [IPHONE_SETUP.md](IPHONE_SETUP.md) for complete Windows/Tailscale/Safari installation steps. Desktop **Settings → iPhone companion** starts the loopback server, displays a single-use pairing code and manages paired devices. The server is disabled by default. A private Tailscale Serve HTTPS address is required; the app does not publish a public website or create a cloud database. The PC must remain awake with the app running, and sessions are cleared after stop/restart.
+
+`npm run dev` builds the mobile assets before starting the development desktop. `npm run build` emits both desktop and mobile HTML entries, original app icons, a web manifest and a static-only service worker. `npm start` opens the production build. The mobile renderer has no Electron bridge and no Node access. The server exposes only whitelisted read data and specific validated mutations; credentials, raw emails and desktop automation interfaces are not available through its API. API responses are never cached by the service worker. There is no offline change queue.
+
+Verification includes local API authentication/security tests and a phone-sized browser flow using the real server/database behind an intercepted private HTTPS origin. Live Tailscale setup and physical iPhone Home Screen behavior require the user's devices. Collection and expense management remain on desktop in this first mobile release; mobile supports viewing them, while outstanding receiving/dates and shipment task status can be changed on the phone.

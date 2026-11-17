@@ -1,3 +1,4 @@
+import { CompanionServer } from "./mobile/server";
 import { MailboxService } from "./mailboxes/service";
 import { net } from "electron";
 import { CollectionService, type PricingSecret } from "./collection/service";
@@ -23,6 +24,7 @@ let tcgBrowser: TcgCatalogBrowser;
 let inbox: InboxService;
 let mailboxes: MailboxService;
 let store: Store;
+let companion: CompanionServer;
 let window: BrowserWindow;
 const dev = process.argv.includes("--dev") && !app.isPackaged;
 function createWindow() {
@@ -79,6 +81,12 @@ else {
       store = await Store.open(
         join(app.getPath("userData"), "personal-toolbox.sqlite"),
       );
+      companion = new CompanionServer(store, join(__dirname, "../../dist"));
+      handle("toolbox:companion-status", () => companion.status());
+      handle("toolbox:companion-start", (input) => companion.start(input));
+      handle("toolbox:companion-stop", () => companion.stop());
+      handle("toolbox:companion-pair", () => companion.rotatePairCode());
+      handle("toolbox:companion-revoke", (id) => companion.revoke(id));
       selling = new SellingService(
         store.selling,
         new WindowsCredentialVault<EbayConnectionInput>(
@@ -252,6 +260,7 @@ else {
     if (process.platform !== "darwin") app.quit();
   });
   app.on("before-quit", () => {
+    companion?.stop();
     selling?.stop();
     collectionService?.stop();
     tcgBrowser?.close();

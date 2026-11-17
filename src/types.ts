@@ -1,3 +1,4 @@
+import type { CompanionStatus, CompanionResult } from "./mobile-types";
 import type {
   MailboxState,
   MailboxResult,
@@ -61,6 +62,11 @@ export type Snapshot = {
 };
 export type NewOrder = Omit<Order, "id">;
 export interface ToolboxAPI {
+  companionStatus(): Promise<CompanionStatus>;
+  startCompanion(input: { url: string }): Promise<CompanionResult>;
+  stopCompanion(): Promise<CompanionResult>;
+  rotateCompanionCode(): Promise<CompanionResult>;
+  revokeCompanionDevice(id: string): Promise<CompanionResult>;
   mailboxState(): Promise<MailboxState>;
   connectMailbox(input: MailboxInput): Promise<MailboxResult>;
   disconnectMailbox(id: string): Promise<MailboxResult>;
