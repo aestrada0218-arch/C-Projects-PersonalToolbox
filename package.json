@@ -1,6 +1,6 @@
 {
   "name": "personal-toolbox",
-  "version": "0.7.0",
+  "version": "0.6.0",
   "private": true,
   "main": "dist-electron/electron/main.js",
   "scripts": {
@@ -11,15 +11,13 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "dist:win": "npm run build && electron-builder --win nsis",
-    "format": "prettier --write src electron tests *.ts *.json *.cjs README.md index.html",
-    "browser:install": "playwright install chromium"
+    "format": "prettier --write src electron tests *.ts *.json *.cjs README.md index.html"
   },
   "dependencies": {
     "html-to-text": "^10.0.1",
     "imapflow": "^2.11.0",
     "lucide-react": "^0.468.0",
     "mailparser": "^3.14.3",
-    "playwright": "^1.65.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.0.0",

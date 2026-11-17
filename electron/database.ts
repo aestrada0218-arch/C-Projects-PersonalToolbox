@@ -4,9 +4,6 @@ import { ShippingRepository } from "./shipping/store";
 import { shippingMigration } from "./shipping/model";
 import { SellingRepository } from "./selling/store";
 import { sellingMigration } from "./selling/model";
-import { EntryRepository } from "./entry/store";
-import { entryMigration } from "./entry/model";
-import { UnavailableProfileCipher, type ProfileCipher } from "./entry/crypto";
 import { ExpenseRepository } from "./expenses/store";
 import { expenseMigration } from "./expenses/model";
 import initSqlJs, { Database } from "sql.js";
@@ -45,7 +42,6 @@ export const orderSchema = z
   })
   .strict();
 export class Store {
-  readonly entries: EntryRepository;
   readonly selling = new SellingRepository(
     () => this.db,
     (fn) => this.mutate(fn),
@@ -66,18 +62,8 @@ export class Store {
     private db: Database,
     private path: string | undefined,
     private restore: (bytes: Uint8Array) => Database,
-    private entryCipher: ProfileCipher,
-  ) {
-    this.entries = new EntryRepository(
-      () => this.db,
-      (fn) => this.mutate(fn),
-      entryCipher,
-    );
-  }
-  static async open(
-    path?: string,
-    options: { entryCipher?: ProfileCipher } = {},
-  ) {
+  ) {}
+  static async open(path?: string) {
     const SQL = await initSqlJs({
       locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm"),
     });
@@ -87,7 +73,6 @@ export class Store {
         : new SQL.Database(),
       path,
       (bytes) => new SQL.Database(bytes),
-      options.entryCipher || new UnavailableProfileCipher(),
     );
     store.migrate();
     return store;
@@ -98,6 +83,7 @@ export class Store {
     );
     const version =
       this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
+    // v0.7 only added separate entry tables; retain them when rolling back.
     if (Number(version) > 8) throw new Error("Unsupported database version");
     if (Number(version) < 1) {
       this.db.run(
@@ -204,21 +190,6 @@ export class Store {
         "BEGIN;" +
           sellingMigration +
           "INSERT INTO migrations VALUES(7); COMMIT;",
-      );
-      this.persist();
-    }
-    if (Number(version) < 8) {
-      if (
-        this.path &&
-        Number(version) > 0 &&
-        !existsSync(this.path + ".pre-entry-v7.bak")
-      )
-        writeFileSync(this.path + ".pre-entry-v7.bak", this.db.export(), {
-          flag: "wx",
-          mode: 0o600,
-        });
-      this.db.run(
-        "BEGIN;" + entryMigration + "INSERT INTO migrations VALUES(8); COMMIT;",
       );
       this.persist();
     }

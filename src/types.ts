@@ -31,15 +31,6 @@ import type {
   SellingReviewResult,
   CategoryGuide,
 } from "./selling-types";
-import type {
-  EntryState,
-  EntryResult,
-  EntryCampaignInput,
-  EntryProfile,
-  EntryProxyInput,
-  EntryImportPreview,
-  EntryAnswer,
-} from "./entry-types";
 export type Order = {
   id: string;
   name: string;
@@ -65,38 +56,6 @@ export type Snapshot = {
 };
 export type NewOrder = Omit<Order, "id">;
 export interface ToolboxAPI {
-  entryState(): Promise<EntryState>;
-  createEntryCampaign(input: EntryCampaignInput): Promise<EntryResult>;
-  editEntryCampaign(input: {
-    id: string;
-    config: EntryCampaignInput;
-  }): Promise<EntryResult>;
-  entryProfile(id: string): Promise<EntryProfile>;
-  editEntryProfile(input: {
-    id: string;
-    profile: EntryProfile;
-    proxyId: string | null;
-  }): Promise<EntryResult>;
-  deleteEntryJob(id: string): Promise<EntryResult>;
-  retryEntryJob(input: { id: string; reviewed: true }): Promise<EntryResult>;
-  previewEntryImport(id: string): Promise<EntryImportPreview>;
-  commitEntryImport(token: string): Promise<EntryResult>;
-  saveEntryTemplate(): Promise<boolean>;
-  saveEntryProxy(input: EntryProxyInput): Promise<EntryResult>;
-  deleteEntryProxy(id: string): Promise<EntryResult>;
-  testEntryProxy(id: string): Promise<EntryResult>;
-  connectEntryGmail(input: GmailConnection): Promise<EntryResult>;
-  disconnectEntryGmail(): Promise<EntryResult>;
-  startEntries(input: {
-    campaignId: string;
-    confirmed: true;
-    reviewJobId?: string;
-  }): Promise<EntryResult>;
-  answerEntryPrompt(input: EntryAnswer): Promise<EntryResult>;
-  focusEntryBrowser(id: string): Promise<EntryResult>;
-  pauseEntries(): Promise<EntryResult>;
-  resumeEntries(): Promise<EntryResult>;
-  stopEntries(): Promise<EntryResult>;
   sellingState(): Promise<SellingState>;
   sellingCategory(
     id: string,

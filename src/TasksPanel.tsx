@@ -23,12 +23,6 @@ import type {
   ShippingStatus,
 } from "./shipping-types";
 import { paymentStatuses, shippingStatuses } from "./shipping-types";
-import EntryRunnerPanel from "./EntryRunnerPanel";
-const taskSections = [
-  ...shippingStatuses,
-  "Entry Runner",
-  "Automation",
-] as const;
 const initial: ShippingState = {
   items: [],
   monitor: {
@@ -81,9 +75,9 @@ export default function TasksPanel({
   const [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [query, setQuery] = useState("");
-  const [tab, setTab] = useState<
-      ShippingStatus | "Automation" | "Entry Runner"
-    >("Needs Shipment"),
+  const [tab, setTab] = useState<ShippingStatus | "Automation">(
+      "Needs Shipment",
+    ),
     [modal, setModal] = useState<Modal | null>(null),
     [page, setPage] = useState(1);
   const running = useRef(false),
@@ -220,194 +214,185 @@ export default function TasksPanel({
           </button>
         </div>
       )}
-      {tab !== "Entry Runner" && (
-        <>
-          <section className="stats expense-stats shipping-stats">
-            {[
-              {
-                label: "Needs Shipment",
-                value: pending.length,
-                icon: ListTodo,
-                detail: "Open shipping tasks",
-              },
-              {
-                label: "Due today",
-                value: today.length,
-                icon: Clock3,
-                detail: "Ship-by date is today",
-              },
-              {
-                label: "Overdue",
-                value: overdue.length,
-                icon: AlertTriangle,
-                detail: "Past the recorded ship-by date",
-              },
-              {
-                label: "Shipped",
-                value: state.items.filter((i) => i.status === "Shipped").length,
-                icon: PackageCheck,
-                detail: "Completed in Personal Toolbox",
-              },
-            ].map(({ label, value, icon: Icon, detail }) => (
-              <article className="stat panel" key={label} aria-label={label}>
-                <div className="stat-top">
-                  {label}
-                  <Icon size={18} />
-                </div>
-                <strong
-                  className={
-                    label === "Overdue" && value ? "shipping-overdue-text" : ""
-                  }
-                >
-                  {value}
-                </strong>
-                <div className="stat-detail">{detail}</div>
-              </article>
-            ))}
-          </section>
-          <section
-            className="panel shipping-monitor"
-            aria-label="eBay sales monitor"
-          >
-            <div className="shipping-monitor-heading">
-              <span className="shipping-mail-icon">
-                <Mail size={22} />
-              </span>
-              <div>
-                <h2>eBay sales monitor</h2>
-                <p>
-                  {state.accountEmail
-                    ? `Connected Gmail: ${state.accountEmail}`
-                    : "Connect Gmail in Inbox to turn sale emails into tasks."}
-                </p>
-              </div>
-              <span
-                className={
-                  state.accountEmail && state.monitor.enabled
-                    ? "badge delivered"
-                    : "badge processing"
-                }
-              >
-                {!state.accountEmail
-                  ? "Gmail required"
-                  : state.monitor.enabled
-                    ? "Automatic checks on"
-                    : "Automatic checks paused"}
-              </span>
+      <section className="stats expense-stats shipping-stats">
+        {[
+          {
+            label: "Needs Shipment",
+            value: pending.length,
+            icon: ListTodo,
+            detail: "Open shipping tasks",
+          },
+          {
+            label: "Due today",
+            value: today.length,
+            icon: Clock3,
+            detail: "Ship-by date is today",
+          },
+          {
+            label: "Overdue",
+            value: overdue.length,
+            icon: AlertTriangle,
+            detail: "Past the recorded ship-by date",
+          },
+          {
+            label: "Shipped",
+            value: state.items.filter((i) => i.status === "Shipped").length,
+            icon: PackageCheck,
+            detail: "Completed in Personal Toolbox",
+          },
+        ].map(({ label, value, icon: Icon, detail }) => (
+          <article className="stat panel" key={label} aria-label={label}>
+            <div className="stat-top">
+              {label}
+              <Icon size={18} />
             </div>
-            <div className="shipping-monitor-controls">
-              <label className="shipping-check-label">
-                <input
-                  type="checkbox"
-                  aria-label="Automatically check eBay sales"
-                  checked={state.monitor.enabled}
-                  disabled={disabled}
-                  onChange={(e) => {
-                    if (running.current) return;
-                    const enabled = e.target.checked;
-                    setState((s) => ({
-                      ...s,
-                      monitor: { ...s.monitor, enabled },
-                    }));
-                    void action(
-                      () =>
-                        window.toolbox!.setShippingMonitor({
-                          enabled,
-                          intervalHours: state.monitor.intervalHours,
-                        }),
-                      "Sales monitoring preference saved.",
-                    );
-                  }}
-                />
-                Check while the app is open
-              </label>
-              <label>
-                Check every{" "}
-                <select
-                  aria-label="Sales check interval"
-                  value={state.monitor.intervalHours}
-                  disabled={disabled}
-                  onChange={(e) =>
-                    void action(
-                      () =>
-                        window.toolbox!.setShippingMonitor({
-                          enabled: state.monitor.enabled,
-                          intervalHours: Number(e.target.value) as
-                            2 | 3 | 6 | 12,
-                        }),
-                      "Sales check interval saved.",
-                    )
-                  }
-                >
-                  {[2, 3, 6, 12].map((h) => (
-                    <option key={h} value={h}>
-                      {h} hours
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button className="text-button" onClick={onOpenInbox}>
-                <Mail size={13} />
-                {state.accountEmail
-                  ? "Manage Gmail connection"
-                  : "Connect Gmail in Inbox"}
-              </button>
-            </div>
-            <div className="shipping-monitor-details">
-              <span>
-                Last successful check: {timeLabel(state.monitor.lastSuccess)}
-              </span>
-              <span>
-                Next:{" "}
-                {!state.accountEmail
-                  ? "Connect Gmail"
-                  : !state.monitor.enabled
-                    ? "Paused"
-                    : state.monitor.nextRun
-                      ? timeLabel(state.monitor.nextRun)
-                      : "When connected / app opens"}
-              </span>
-            </div>
-            <p className="shipping-help">
-              Checks read Gmail’s INBOX, including already-read messages. The
-              first scan covers up to 90 days, then continues from the last
-              processed message. Checks resume when the app reopens. Sale tasks
-              are local reminders; marking shipped does not update eBay.
+            <strong
+              className={
+                label === "Overdue" && value ? "shipping-overdue-text" : ""
+              }
+            >
+              {value}
+            </strong>
+            <div className="stat-detail">{detail}</div>
+          </article>
+        ))}
+      </section>
+      <section
+        className="panel shipping-monitor"
+        aria-label="eBay sales monitor"
+      >
+        <div className="shipping-monitor-heading">
+          <span className="shipping-mail-icon">
+            <Mail size={22} />
+          </span>
+          <div>
+            <h2>eBay sales monitor</h2>
+            <p>
+              {state.accountEmail
+                ? `Connected Gmail: ${state.accountEmail}`
+                : "Connect Gmail in Inbox to turn sale emails into tasks."}
             </p>
-            {state.monitor.lastSuccess && (
-              <p className="shipping-scan-count">
-                Last batch: {state.monitor.scanned} emails checked ·{" "}
-                {state.monitor.skipped} skipped
-              </p>
-            )}
-            {state.monitor.error && (
-              <div className="alert" role="alert">
-                Sales check failed: {state.monitor.error} Your existing tasks
-                were kept.
-              </div>
-            )}
-            {state.monitor.limited && (
-              <p className="shipping-review-note">
-                More matching emails remain. Catch-up checks process 100
-                messages at a time, about one minute apart while monitoring is
-                on.
-              </p>
-            )}
-            {state.monitor.skipped > 0 && (
-              <p className="shipping-review-note">
-                Some emails were missing, too large, or could not be parsed.
-                Review those sales in eBay and add a task manually if needed.
-              </p>
-            )}
-          </section>
-        </>
-      )}
+          </div>
+          <span
+            className={
+              state.accountEmail && state.monitor.enabled
+                ? "badge delivered"
+                : "badge processing"
+            }
+          >
+            {!state.accountEmail
+              ? "Gmail required"
+              : state.monitor.enabled
+                ? "Automatic checks on"
+                : "Automatic checks paused"}
+          </span>
+        </div>
+        <div className="shipping-monitor-controls">
+          <label className="shipping-check-label">
+            <input
+              type="checkbox"
+              aria-label="Automatically check eBay sales"
+              checked={state.monitor.enabled}
+              disabled={disabled}
+              onChange={(e) => {
+                if (running.current) return;
+                const enabled = e.target.checked;
+                setState((s) => ({ ...s, monitor: { ...s.monitor, enabled } }));
+                void action(
+                  () =>
+                    window.toolbox!.setShippingMonitor({
+                      enabled,
+                      intervalHours: state.monitor.intervalHours,
+                    }),
+                  "Sales monitoring preference saved.",
+                );
+              }}
+            />
+            Check while the app is open
+          </label>
+          <label>
+            Check every{" "}
+            <select
+              aria-label="Sales check interval"
+              value={state.monitor.intervalHours}
+              disabled={disabled}
+              onChange={(e) =>
+                void action(
+                  () =>
+                    window.toolbox!.setShippingMonitor({
+                      enabled: state.monitor.enabled,
+                      intervalHours: Number(e.target.value) as 2 | 3 | 6 | 12,
+                    }),
+                  "Sales check interval saved.",
+                )
+              }
+            >
+              {[2, 3, 6, 12].map((h) => (
+                <option key={h} value={h}>
+                  {h} hours
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="text-button" onClick={onOpenInbox}>
+            <Mail size={13} />
+            {state.accountEmail
+              ? "Manage Gmail connection"
+              : "Connect Gmail in Inbox"}
+          </button>
+        </div>
+        <div className="shipping-monitor-details">
+          <span>
+            Last successful check: {timeLabel(state.monitor.lastSuccess)}
+          </span>
+          <span>
+            Next:{" "}
+            {!state.accountEmail
+              ? "Connect Gmail"
+              : !state.monitor.enabled
+                ? "Paused"
+                : state.monitor.nextRun
+                  ? timeLabel(state.monitor.nextRun)
+                  : "When connected / app opens"}
+          </span>
+        </div>
+        <p className="shipping-help">
+          Checks read Gmail’s INBOX, including already-read messages. The first
+          scan covers up to 90 days, then continues from the last processed
+          message. Checks resume when the app reopens. Sale tasks are local
+          reminders; marking shipped does not update eBay.
+        </p>
+        {state.monitor.lastSuccess && (
+          <p className="shipping-scan-count">
+            Last batch: {state.monitor.scanned} emails checked ·{" "}
+            {state.monitor.skipped} skipped
+          </p>
+        )}
+        {state.monitor.error && (
+          <div className="alert" role="alert">
+            Sales check failed: {state.monitor.error} Your existing tasks were
+            kept.
+          </div>
+        )}
+        {state.monitor.limited && (
+          <p className="shipping-review-note">
+            More matching emails remain. Catch-up checks process 100 messages at
+            a time, about one minute apart while monitoring is on.
+          </p>
+        )}
+        {state.monitor.skipped > 0 && (
+          <p className="shipping-review-note">
+            Some emails were missing, too large, or could not be parsed. Review
+            those sales in eBay and add a task manually if needed.
+          </p>
+        )}
+      </section>
       <div
         className="collection-tabs shipping-tabs"
         role="tablist"
         aria-label="Task sections"
       >
-        {taskSections.map((name, index) => (
+        {[...shippingStatuses, "Automation" as const].map((name, index) => (
           <button
             role="tab"
             id={`shipping-tab-${index}`}
@@ -420,7 +405,7 @@ export default function TasksPanel({
               setPage(1);
             }}
             onKeyDown={(e) => {
-              const tabs = taskSections;
+              const tabs = [...shippingStatuses, "Automation" as const];
               if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key))
                 return;
               e.preventDefault();
@@ -442,33 +427,27 @@ export default function TasksPanel({
               <ListTodo size={15} />
             ) : name === "Shipped" ? (
               <PackageCheck size={15} />
-            ) : name === "Automation" || name === "Entry Runner" ? (
+            ) : name === "Automation" ? (
               <Activity size={15} />
             ) : (
               <X size={15} />
             )}{" "}
             {name}
             <span>
-              {name === "Entry Runner"
-                ? "New"
-                : name === "Automation"
-                  ? samples.length
-                  : state.items.filter((i) => i.status === name).length}
+              {name === "Automation"
+                ? samples.length
+                : state.items.filter((i) => i.status === name).length}
             </span>
           </button>
         ))}
       </div>
       <section
         id="shipping-task-panel"
-        className={
-          tab === "Entry Runner" ? "entry-module" : "panel shipping-list"
-        }
+        className="panel shipping-list"
         role="tabpanel"
-        aria-labelledby={`shipping-tab-${taskSections.indexOf(tab)}`}
+        aria-labelledby={`shipping-tab-${[...shippingStatuses, "Automation"].indexOf(tab)}`}
       >
-        {tab === "Entry Runner" ? (
-          <EntryRunnerPanel onOpenInbox={onOpenInbox} />
-        ) : tab === "Automation" ? (
+        {tab === "Automation" ? (
           <div className="shipping-automation">
             <h2>Monitoring & automation</h2>
             <p>
