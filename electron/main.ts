@@ -11,6 +11,11 @@ import { InboxService } from "./inbox/service";
 import { WindowsCredentialVault } from "./inbox/credentials";
 import { GmailImapProvider } from "./inbox/gmail";
 import { registerExpenseHandlers } from "./expenses/ipc";
+import { SellingService } from "./selling/service";
+import { EbayProvider } from "./selling/ebay";
+import { registerSellingHandlers } from "./selling/ipc";
+import type { EbayConnectionInput } from "../src/selling-types";
+let selling: SellingService;
 let stopExpenseTimer: (() => void) | undefined;
 let collectionService: CollectionService;
 let tcgBrowser: TcgCatalogBrowser;
@@ -72,6 +77,20 @@ else {
       store = await Store.open(
         join(app.getPath("userData"), "personal-toolbox.sqlite"),
       );
+      selling = new SellingService(
+        store.selling,
+        new WindowsCredentialVault<EbayConnectionInput>(
+          "PersonalToolbox/EbaySelling/v1",
+        ),
+        new EbayProvider(
+          () => store.selling.settings().cooldownUntil,
+          (until) => store.selling.cooldown(until),
+          (url, init) =>
+            net.fetch(url instanceof URL ? url.toString() : url, init),
+        ),
+      );
+      registerSellingHandlers(selling, store.selling, () => window, handle);
+      selling.start();
       collectionService = new CollectionService(
         store.collection,
         new WindowsCredentialVault<PricingSecret>("PersonalToolbox/JustTCG/v1"),
@@ -168,6 +187,7 @@ else {
     if (process.platform !== "darwin") app.quit();
   });
   app.on("before-quit", () => {
+    selling?.stop();
     collectionService?.stop();
     tcgBrowser?.close();
     stopExpenseTimer?.();

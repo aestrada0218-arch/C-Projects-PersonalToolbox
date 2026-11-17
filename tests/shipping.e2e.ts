@@ -148,6 +148,9 @@ test("Needs Shipment: parsed sale deadlines, editing, completion, cancellation, 
     await page
       .getByLabel("Sales check interval", { exact: true })
       .selectOption("6");
+    await expect(page.getByRole("status")).toContainText(
+      "Sales check interval saved.",
+    );
     await page
       .getByLabel("Automatically check eBay sales", { exact: true })
       .uncheck();

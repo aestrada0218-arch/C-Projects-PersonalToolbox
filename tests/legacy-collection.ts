@@ -10,7 +10,13 @@ DROP TABLE collection_current;
 DELETE FROM migrations WHERE version=5;`);
 }
 export function makeShippingV5(db: Database) {
+  makeSellingV6(db);
   db.run(
     "DROP TABLE IF EXISTS shipping_receipts; DROP TABLE IF EXISTS shipping_tasks; DROP TABLE IF EXISTS shipping_monitor; DELETE FROM migrations WHERE version=6;",
+  );
+}
+export function makeSellingV6(db: Database) {
+  db.run(
+    "DROP TABLE IF EXISTS selling_events; DROP TABLE IF EXISTS selling_units; DROP TABLE IF EXISTS selling_settings; DELETE FROM migrations WHERE version=7;",
   );
 }

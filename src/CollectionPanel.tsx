@@ -16,6 +16,7 @@ import {
   History,
   ImagePlus,
   Link as LinkIcon,
+  Tag,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -64,9 +65,11 @@ type Modal =
   | { kind: "add"; card: CatalogCard; variant: CatalogVariant }
   | { kind: "history"; item: OwnedCollectible; quotes: QuoteObservation[] };
 export default function CollectionPanel({
+  onSell,
   onChanged,
   productRequest,
 }: {
+  onSell: (id: string) => void;
   onChanged: () => void;
   productRequest: { id: string; nonce: number } | null;
 }) {
@@ -831,6 +834,14 @@ export default function CollectionPanel({
                     </td>
                     <td>
                       <div className="collection-row-actions">
+                        <button
+                          aria-label={"Sell item " + item.name}
+                          title="Create a shared eBay / Mercari listing draft"
+                          disabled={disabled}
+                          onClick={() => onSell(item.id)}
+                        >
+                          <Tag size={14} />
+                        </button>
                         <button
                           aria-label={"Refresh value " + item.name}
                           title={

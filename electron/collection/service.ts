@@ -14,6 +14,8 @@ import { apiKeySchema, searchSchema, cents } from "./model";
 export type PricingSecret = { apiKey: string };
 export function pricingError(error: unknown) {
   const code = error instanceof Error ? error.message : "";
+  if (code === "COLLECTION_ALLOCATED")
+    return "This collection entry has reserved or sold copies in Selling. Remove unused drafts first; quantity cannot be reduced below its saved listing records.";
   return code === "PRICE_RATE_LIMIT"
     ? "Pricing request limit reached. Wait for the cooldown or check your JustTCG plan before retrying."
     : code === "PRICE_AUTH"

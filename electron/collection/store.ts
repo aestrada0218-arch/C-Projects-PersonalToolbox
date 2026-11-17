@@ -200,6 +200,13 @@ export class CollectionRepository {
     const old = this.items().find((i) => i.id === id);
     if (!old) throw Error("Item missing");
     this.transaction(() => {
+      const allocated = Number(
+        this.rows(
+          "SELECT COUNT(*) AS total FROM selling_units WHERE collectionId=?",
+          [id],
+        )[0]?.total || 0,
+      );
+      if (item.quantity < allocated) throw Error("COLLECTION_ALLOCATED");
       if (old.provider === "justtcg") {
         // Catalog identity and price stay bound to the exact variant; only ownership fields/photo can change.
         this.db().run(
@@ -239,6 +246,13 @@ export class CollectionRepository {
     });
   }
   remove(id: unknown) {
+    const allocated = Number(
+      this.rows(
+        "SELECT COUNT(*) AS total FROM selling_units WHERE collectionId=?",
+        [z.string().uuid().parse(id)],
+      )[0]?.total || 0,
+    );
+    if (allocated) throw Error("COLLECTION_ALLOCATED");
     const key = z.string().uuid().parse(id);
     this.transaction(() =>
       this.db().run("DELETE FROM collection WHERE id=?", [key]),

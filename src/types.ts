@@ -23,6 +23,14 @@ import type {
   ShippingTaskInput,
   ShippingMonitor,
 } from "./shipping-types";
+import type {
+  SellingState,
+  SellingResult,
+  ListingDraft,
+  EbayConnectionInput,
+  SellingReviewResult,
+  CategoryGuide,
+} from "./selling-types";
 export type Order = {
   id: string;
   name: string;
@@ -48,6 +56,57 @@ export type Snapshot = {
 };
 export type NewOrder = Omit<Order, "id">;
 export interface ToolboxAPI {
+  sellingState(): Promise<SellingState>;
+  sellingCategory(
+    id: string,
+  ): Promise<SellingResult & { guide?: CategoryGuide }>;
+  connectEbay(input: EbayConnectionInput): Promise<SellingResult>;
+  disconnectEbay(): Promise<SellingResult>;
+  createSellingDraft(input: ListingDraft): Promise<SellingResult>;
+  editSellingDraft(input: {
+    id: string;
+    draft: ListingDraft;
+  }): Promise<SellingResult>;
+  deleteSellingDraft(id: string): Promise<SellingResult>;
+  refreshSellingOptions(): Promise<SellingResult>;
+  createSellingLocation(input: {
+    name: string;
+    zip: string;
+  }): Promise<SellingResult>;
+  prepareEbayOffer(id: string): Promise<SellingReviewResult>;
+  publishEbayOffer(input: {
+    token: string;
+    confirmed: true;
+  }): Promise<SellingResult>;
+  reconcileEbayOffer(id: string): Promise<SellingResult>;
+  endEbayOffer(id: string): Promise<SellingResult>;
+  linkMercariListing(input: {
+    id: string;
+    url: string;
+  }): Promise<SellingResult>;
+  confirmMercariInactive(input: {
+    id: string;
+    expectedId: string;
+    confirmed: true;
+  }): Promise<SellingResult>;
+  recordMercariSale(input: {
+    id: string;
+    expectedId: string;
+    reference: string;
+  }): Promise<SellingResult>;
+  reviewSellingConflict(id: string): Promise<SellingResult>;
+  setSellingAuto(value: boolean): Promise<SellingResult>;
+  syncSelling(): Promise<SellingResult>;
+  openSellingListing(input: {
+    id: string;
+    platform: "ebay" | "mercari";
+  }): Promise<boolean>;
+  openSellingHelp(page: "ebay" | "mercari"): Promise<boolean>;
+  copySellingDraft(input: {
+    id: string;
+    field: "title" | "description" | "all";
+  }): Promise<boolean>;
+  uploadSellingPhoto(id: string): Promise<SellingResult>;
   shippingState(): Promise<ShippingState>;
   checkSales(): Promise<ShippingResult>;
   setShippingMonitor(

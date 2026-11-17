@@ -294,16 +294,19 @@ export default function TasksPanel({
               aria-label="Automatically check eBay sales"
               checked={state.monitor.enabled}
               disabled={disabled}
-              onChange={(e) =>
+              onChange={(e) => {
+                if (running.current) return;
+                const enabled = e.target.checked;
+                setState((s) => ({ ...s, monitor: { ...s.monitor, enabled } }));
                 void action(
                   () =>
                     window.toolbox!.setShippingMonitor({
-                      enabled: e.target.checked,
+                      enabled,
                       intervalHours: state.monitor.intervalHours,
                     }),
                   "Sales monitoring preference saved.",
-                )
-              }
+                );
+              }}
             />
             Check while the app is open
           </label>

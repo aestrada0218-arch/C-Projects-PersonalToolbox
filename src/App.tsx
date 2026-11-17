@@ -1,4 +1,5 @@
 import CollectionPanel from "./CollectionPanel";
+import SellingPanel from "./SellingPanel";
 import TasksPanel from "./TasksPanel";
 import ExpensesPanel from "./ExpensesPanel";
 import InboxPanel from "./InboxPanel";
@@ -28,6 +29,7 @@ import {
   X,
   Command,
   ShieldCheck,
+  Tag,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -52,6 +54,7 @@ const nav = [
   ["Analytics", LayoutDashboard],
   ["Orders", ShoppingBag],
   ["Collection", Layers],
+  ["Selling", Tag],
   ["Tasks", ListTodo],
   ["Proxies", Globe],
   ["Profiles", Contact],
@@ -72,6 +75,10 @@ const plans: Record<string, string> = {
 export default function App() {
   const [data, setData] = useState<Snapshot>(empty);
   const [page, setPage] = useState("Analytics");
+  const [sellingRequest, setSellingRequest] = useState<{
+    id: string;
+    nonce: number;
+  } | null>(null);
   const [productRequest, setProductRequest] = useState<{
     id: string;
     nonce: number;
@@ -229,6 +236,7 @@ export default function App() {
               key={name}
               className={page === name ? "active" : ""}
               onClick={() => {
+                if (name === "Selling") setSellingRequest(null);
                 setPage(name);
                 setQuery("");
                 setStatus("All statuses");
@@ -253,7 +261,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.5.0</span>
+            <span>v0.6.0</span>
           </div>
         </div>
       </aside>
@@ -271,7 +279,7 @@ export default function App() {
           </div>
         </header>
         <main>
-          {!["Expenses", "Collection", "Tasks"].includes(page) && (
+          {!["Expenses", "Collection", "Tasks", "Selling"].includes(page) && (
             <>
               {" "}
               <div className="title-row">
@@ -683,11 +691,21 @@ export default function App() {
               )}
               {page === "Collection" && (
                 <CollectionPanel
+                  onSell={(id) => {
+                    setSellingRequest({ id, nonce: Date.now() });
+                    setPage("Selling");
+                  }}
                   onChanged={refreshCollectionSnapshot}
                   productRequest={productRequest}
                 />
               )}
               {page === "Expenses" && <ExpensesPanel />}
+              {page === "Selling" && (
+                <SellingPanel
+                  itemRequest={sellingRequest}
+                  onChanged={refreshCollectionSnapshot}
+                />
+              )}
               {page === "Tasks" && (
                 <TasksPanel
                   samples={data.tasks}
@@ -721,7 +739,7 @@ export default function App() {
                 ? "Local database connected"
                 : "Desktop connection required"}
             </span>
-            <span>v0.5 · Sample data included.</span>
+            <span>v0.6 · Sample data included.</span>
           </footer>
         </main>
       </div>

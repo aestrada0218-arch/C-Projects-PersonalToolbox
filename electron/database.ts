@@ -2,6 +2,8 @@ import { CollectionRepository } from "./collection/store";
 import { collectionMigration } from "./collection/model";
 import { ShippingRepository } from "./shipping/store";
 import { shippingMigration } from "./shipping/model";
+import { SellingRepository } from "./selling/store";
+import { sellingMigration } from "./selling/model";
 import { ExpenseRepository } from "./expenses/store";
 import { expenseMigration } from "./expenses/model";
 import initSqlJs, { Database } from "sql.js";
@@ -40,6 +42,10 @@ export const orderSchema = z
   })
   .strict();
 export class Store {
+  readonly selling = new SellingRepository(
+    () => this.db,
+    (fn) => this.mutate(fn),
+  );
   readonly shipping = new ShippingRepository(
     () => this.db,
     (fn) => this.mutate(fn),
@@ -77,7 +83,7 @@ export class Store {
     );
     const version =
       this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
-    if (Number(version) > 6) throw new Error("Unsupported database version");
+    if (Number(version) > 7) throw new Error("Unsupported database version");
     if (Number(version) < 1) {
       this.db.run(
         `BEGIN; CREATE TABLE orders(id TEXT PRIMARY KEY,name TEXT NOT NULL,store TEXT NOT NULL,category TEXT NOT NULL,total REAL NOT NULL CHECK(total>=0),status TEXT NOT NULL CHECK(status IN ('Delivered','In transit','Processing','Cancelled')),date TEXT NOT NULL); CREATE TABLE collection(id TEXT PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),purchase REAL NOT NULL,market REAL NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO migrations VALUES(1);`,
@@ -167,6 +173,23 @@ export class Store {
       const account = this.inboxAccount();
       if (account) this.shipping.bindAccountInTransaction(account.email);
       this.db.run("INSERT INTO migrations VALUES(6); COMMIT;");
+      this.persist();
+    }
+    if (Number(version) < 7) {
+      if (
+        this.path &&
+        Number(version) > 0 &&
+        !existsSync(this.path + ".pre-selling-v6.bak")
+      )
+        writeFileSync(this.path + ".pre-selling-v6.bak", this.db.export(), {
+          flag: "wx",
+          mode: 0o600,
+        });
+      this.db.run(
+        "BEGIN;" +
+          sellingMigration +
+          "INSERT INTO migrations VALUES(7); COMMIT;",
+      );
       this.persist();
     }
   }

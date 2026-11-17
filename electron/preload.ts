@@ -2,6 +2,48 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "toolbox",
   Object.freeze({
+    sellingState: () => ipcRenderer.invoke("toolbox:selling-state"),
+    sellingCategory: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-category", id),
+    connectEbay: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-connect", input),
+    disconnectEbay: () => ipcRenderer.invoke("toolbox:selling-disconnect"),
+    createSellingDraft: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-create", input),
+    editSellingDraft: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-edit", input),
+    deleteSellingDraft: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-delete", id),
+    refreshSellingOptions: () => ipcRenderer.invoke("toolbox:selling-options"),
+    createSellingLocation: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-location", input),
+    prepareEbayOffer: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-prepare", id),
+    publishEbayOffer: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-publish", input),
+    reconcileEbayOffer: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-reconcile", id),
+    endEbayOffer: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-end", id),
+    linkMercariListing: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-link-mercari", input),
+    confirmMercariInactive: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-inactive-mercari", input),
+    recordMercariSale: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-sale-mercari", input),
+    reviewSellingConflict: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-conflict", id),
+    setSellingAuto: (value: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-auto", value),
+    syncSelling: () => ipcRenderer.invoke("toolbox:selling-sync"),
+    openSellingListing: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-open", input),
+    openSellingHelp: (page: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-help", page),
+    copySellingDraft: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-copy", input),
+    uploadSellingPhoto: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:selling-photo", id),
     shippingState: () => ipcRenderer.invoke("toolbox:shipping-state"),
     checkSales: () => ipcRenderer.invoke("toolbox:shipping-check"),
     setShippingMonitor: (input: unknown) =>
