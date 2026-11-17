@@ -1,3 +1,4 @@
+import { makeMailV8 } from "./legacy-collection";
 import { it, expect } from "vitest";
 import initSqlJs from "sql.js";
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
@@ -14,6 +15,7 @@ it("opens a v0.7 database and preserves separate entry data while updating exist
       locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm"),
     });
     let raw = new SQL.Database(readFileSync(file));
+    makeMailV8(raw);
     raw.run(
       readFileSync(join(process.cwd(), "tests/fixtures/entry-v8.sql"), "utf8"),
     );
@@ -35,13 +37,12 @@ it("opens a v0.7 database and preserves separate entry data while updating exist
     store.close();
     raw = new SQL.Database(readFileSync(file));
     expect(
-      raw.exec(
-        "SELECT runnerEmail FROM entry_settings WHERE id=1",
-      )[0].values[0][0],
+      raw.exec("SELECT runnerEmail FROM entry_settings WHERE id=1")[0]
+        .values[0][0],
     ).toBe("preserve@example.com");
     expect(
       raw.exec("SELECT MAX(version) FROM migrations")[0].values[0][0],
-    ).toBe(8);
+    ).toBe(9);
     raw.run("INSERT INTO migrations VALUES(999)");
     writeFileSync(file, raw.export());
     raw.close();

@@ -47,7 +47,7 @@ it("reads an original forwarded subject but ignores quoted delivered history and
     extractEmailUpdate("Fwd: Lunch plans", "See you tomorrow", received, "c"),
   ).toBeNull();
 });
-it("deduplicates untracked updates, applies only explicit order links, prevents regressions, and clears on disconnect", async () => {
+it("deduplicates untracked updates, applies only explicit order links, prevents regressions, and retains imported history on disconnect", async () => {
   const db = await Store.open();
   try {
     const update = extractEmailUpdate(
@@ -92,7 +92,7 @@ it("deduplicates untracked updates, applies only explicit order links, prevents 
       }),
     ).toThrow();
     db.disconnectInbox();
-    expect(db.emailUpdates()).toEqual([]);
+    expect(db.emailUpdates()).toHaveLength(2);
     expect(db.snapshot().orders).toHaveLength(36);
   } finally {
     db.close();

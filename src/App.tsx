@@ -9,8 +9,6 @@ import {
   ShoppingBag,
   Layers,
   ListTodo,
-  Globe,
-  Contact,
   Inbox,
   Receipt,
   Settings,
@@ -30,6 +28,7 @@ import {
   Command,
   ShieldCheck,
   Tag,
+  Trash2,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -56,19 +55,12 @@ const nav = [
   ["Collection", Layers],
   ["Selling", Tag],
   ["Tasks", ListTodo],
-  ["Proxies", Globe],
-  ["Profiles", Contact],
   ["Inbox", Inbox],
   ["Expenses", Receipt],
   ["Settings", Settings],
 ] as const;
 const empty: Snapshot = { orders: [], collection: [], tasks: [] };
 const plans: Record<string, string> = {
-  Proxies:
-    "Organize proxy groups, test connectivity, and monitor health. Authentication will use Windows Credential Manager.",
-  Profiles:
-    "Manage account and shipping profiles with secure sensitive fields and validated CSV import.",
-
   Settings:
     "Configure preferences, notifications, database backups, and storage.",
 };
@@ -100,6 +92,8 @@ export default function App() {
   const [range, setRange] = useState("90");
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
@@ -261,7 +255,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.6.0</span>
+            <span>v0.8.0</span>
           </div>
         </div>
       </aside>
@@ -619,6 +613,7 @@ export default function App() {
                           <th>DATE</th>
                           <th>STATUS</th>
                           <th className="right">TOTAL</th>
+                          {page === "Orders" && <th>ACTIONS</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -666,6 +661,20 @@ export default function App() {
                                 </span>
                               </td>
                               <td className="right total">{money(o.total)}</td>
+                              {page === "Orders" && (
+                                <td>
+                                  <button
+                                    className="text-button danger-button"
+                                    aria-label={"Delete order " + o.name}
+                                    onClick={() => {
+                                      setDeleteId(o.id);
+                                      setError("");
+                                    }}
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </td>
+                              )}
                             </tr>
                           ))}
                       </tbody>
@@ -739,10 +748,53 @@ export default function App() {
                 ? "Local database connected"
                 : "Desktop connection required"}
             </span>
-            <span>v0.6 · Sample data included.</span>
+            <span>v0.8 · Sample data included.</span>
           </footer>
         </main>
       </div>
+      {deleteId && (
+        <div className="modal-overlay">
+          <section
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-order-title"
+          >
+            <h2 id="delete-order-title">Delete order?</h2>
+            <p>{data.orders.find((o) => o.id === deleteId)?.name}</p>
+            <p>
+              This removes the order from analytics. Email updates remain saved
+              and are unlinked.
+            </p>
+            {error && <p role="alert">{error}</p>}
+            <div className="modal-actions">
+              <button disabled={deleting} onClick={() => setDeleteId(null)}>
+                Cancel
+              </button>
+              <button
+                className="danger-button"
+                disabled={deleting}
+                onClick={async () => {
+                  setDeleting(true);
+                  try {
+                    setData(await window.toolbox!.deleteOrder(deleteId));
+                    setDeleteId(null);
+                    setNotice("Order deleted.");
+                  } catch {
+                    setError(
+                      "Could not delete this order. Check storage permissions and retry.",
+                    );
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+              >
+                {deleting ? "Deleting…" : "Delete order"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       {modal && (
         <OrderModal
           onClose={() => setModal(false)}

@@ -162,7 +162,7 @@ describe("inbox service and database", () => {
       expect(service.state().shipments[0].status).toBe("Delivered");
       expect((await service.disconnect()).ok).toBe(true);
       expect(service.state().account).toBeNull();
-      expect(service.state().shipments).toEqual([]);
+      expect(service.state().shipments).toHaveLength(1);
       expect(vault.remove).toHaveBeenCalled();
       expect(db.snapshot().orders).toHaveLength(36);
     } finally {

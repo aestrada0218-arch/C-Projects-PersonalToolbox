@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
-export type MailSecret = { email: string; appPassword: string };
+export type MailSecret = { email: string; appPassword: string; host?:string; port?:number; folder?:string };
 export interface CredentialVault<T = MailSecret> {
   read(): Promise<T | null>;
   write(secret: T): Promise<void>;

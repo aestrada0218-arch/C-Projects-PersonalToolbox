@@ -28,6 +28,7 @@ export class CollectionRepository {
   items(): OwnedCollectible[] {
     return this.rows("SELECT * FROM collection ORDER BY name,id").map((r) => ({
       id: String(r.id),
+      purchaseDate: r.purchaseDate === null ? null : String(r.purchaseDate),
       name: String(r.name),
       category: String(r.category),
       collectionType: r.collectionType,

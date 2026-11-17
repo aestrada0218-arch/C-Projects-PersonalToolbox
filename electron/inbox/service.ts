@@ -290,8 +290,14 @@ export class InboxService {
     this.busy = true;
     let error: string | undefined;
     try {
+      const old = await this.vault.read();
       await this.vault.remove();
-      this.store.disconnectInbox();
+      try {
+        this.store.disconnectInbox();
+      } catch (e) {
+        if (old) await this.vault.write(old);
+        throw e;
+      }
     } catch (e) {
       error =
         e instanceof Error && e.message === "CREDENTIAL_UNAVAILABLE"

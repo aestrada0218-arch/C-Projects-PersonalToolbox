@@ -16,7 +16,14 @@ export function makeShippingV5(db: Database) {
   );
 }
 export function makeSellingV6(db: Database) {
+  makeMailV8(db);
   db.run(
     "DROP TABLE IF EXISTS selling_events; DROP TABLE IF EXISTS selling_units; DROP TABLE IF EXISTS selling_settings; DELETE FROM migrations WHERE version=7;",
+  );
+}
+
+export function makeMailV8(db: Database) {
+  db.run(
+    "DROP TABLE IF EXISTS outstanding_receipts;DROP TABLE IF EXISTS outstanding_orders;DROP TABLE IF EXISTS mail_cursors;DROP TABLE IF EXISTS mailboxes;ALTER TABLE collection DROP COLUMN purchaseDate;DELETE FROM migrations WHERE version=9;",
   );
 }

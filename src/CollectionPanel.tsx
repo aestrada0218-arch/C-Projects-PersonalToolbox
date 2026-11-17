@@ -1,3 +1,4 @@
+import { OutstandingOrders } from "./MailboxPanels";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Layers,
@@ -75,7 +76,7 @@ export default function CollectionPanel({
 }) {
   const [state, setState] = useState(initial);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"all" | CollectionTab>("all");
+  const [tab, setTab] = useState<"all" | "outstanding" | CollectionTab>("all");
   const [filter, setFilter] = useState("");
   const [query, setQuery] = useState("");
   const [game, setGame] = useState("");
@@ -393,6 +394,7 @@ export default function CollectionPanel({
             { id: "cards", name: "TCGplayer / Cards", Icon: Layers },
             { id: "comics", name: "Comic books", Icon: BookOpen },
             { id: "other", name: "Other collectibles", Icon: Package },
+            { id: "outstanding", name: "Outstanding orders", Icon: Package },
           ] as const
         ).map(({ id, name, Icon }, index) => (
           <button
@@ -407,12 +409,18 @@ export default function CollectionPanel({
               setPage(1);
             }}
             onKeyDown={(e) => {
-              const ids = ["all", "cards", "comics", "other"] as const;
+              const ids = [
+                "all",
+                "cards",
+                "comics",
+                "other",
+                "outstanding",
+              ] as const;
               let next = index;
-              if (e.key === "ArrowRight") next = (index + 1) % 4;
-              else if (e.key === "ArrowLeft") next = (index + 3) % 4;
+              if (e.key === "ArrowRight") next = (index + 1) % 5;
+              else if (e.key === "ArrowLeft") next = (index + 4) % 5;
               else if (e.key === "Home") next = 0;
-              else if (e.key === "End") next = 3;
+              else if (e.key === "End") next = 4;
               else return;
               e.preventDefault();
               setTab(ids[next]);
@@ -423,9 +431,11 @@ export default function CollectionPanel({
             <Icon size={16} />
             {name}
             <span>
-              {id === "all"
-                ? state.items.length
-                : state.items.filter((i) => i.collectionType === id).length}
+              {id === "outstanding"
+                ? "Incoming"
+                : id === "all"
+                  ? state.items.length
+                  : state.items.filter((i) => i.collectionType === id).length}
             </span>
           </button>
         ))}
@@ -435,515 +445,559 @@ export default function CollectionPanel({
         role="tabpanel"
         aria-labelledby={"collection-tab-" + tab}
       >
-        {tab === "cards" && (
-          <section className="panel collection-catalog">
-            <div className="panel-heading">
-              <div>
-                <h2>Find your next collection item</h2>
-                <p>
-                  Search card data and variant pricing from JustTCG, or browse
-                  TCGplayer directly.
-                </p>
-              </div>
-              <button
-                className="secondary"
-                disabled={disabled}
-                onClick={() =>
-                  void window
-                    .toolbox!.browseTcg()
-                    .catch(() =>
-                      setError("Could not open the TCGplayer catalog window."),
-                    )
-                }
-              >
-                <ExternalLink size={14} />
-                Browse TCGplayer
-              </button>
-            </div>
-            <div className="catalog-source">
-              <LinkIcon size={12} />
-              <span>tcgplayer.com/categories</span>
-              <span>·</span>
-              <span>Price data: JustTCG · USD</span>
-              {openProduct && (
-                <button
-                  className="text-button"
-                  disabled={disabled}
-                  onClick={() => {
-                    setQuery(openProduct);
-                    void search(openProduct, 0);
-                  }}
-                >
-                  Look up open product #{openProduct}
-                </button>
-              )}
-            </div>
-            <form
-              className="catalog-search"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void search(query, 0);
-              }}
-            >
-              <label>
-                <span>Card name, TCGplayer product URL, or product ID</span>
-                <div className="search">
-                  <Search size={16} />
-                  <input
-                    aria-label="Search card catalog"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    required
-                    minLength={2}
-                    maxLength={2048}
-                    placeholder="e.g. Charizard, Black Lotus, or a product link"
-                  />
-                </div>
-              </label>
-              <label>
-                <span>Game</span>
-                <select
-                  aria-label="Card game"
-                  value={game}
-                  onChange={(e) => setGame(e.target.value)}
-                >
-                  <option value="">All games</option>
-                  {state.settings.games.map((g) => (
-                    <option value={g.id} key={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                className="primary"
-                disabled={disabled || !state.settings.connected}
-                type="submit"
-              >
-                <Search size={14} />
-                Search
-              </button>
-            </form>
-            {!state.settings.connected && (
-              <div className="collection-setup">
-                <ShieldCheck size={22} />
-                <div>
-                  <h3>Connect a free JustTCG personal key</h3>
-                  <p>
-                    TCGplayer browsing works separately. A pricing connection
-                    enables in-app results and manual value refresh.
-                  </p>
+        {tab === "outstanding" ? (
+          <OutstandingOrders
+            onReceived={() => {
+              void window.toolbox!.collectionState().then(setState);
+              onChanged();
+            }}
+          />
+        ) : (
+          <>
+            {tab === "cards" && (
+              <section className="panel collection-catalog">
+                <div className="panel-heading">
+                  <div>
+                    <h2>Find your next collection item</h2>
+                    <p>
+                      Search card data and variant pricing from JustTCG, or
+                      browse TCGplayer directly.
+                    </p>
+                  </div>
                   <button
-                    className="text-button"
+                    className="secondary"
                     disabled={disabled}
-                    onClick={() => open({ kind: "connect" })}
+                    onClick={() =>
+                      void window
+                        .toolbox!.browseTcg()
+                        .catch(() =>
+                          setError(
+                            "Could not open the TCGplayer catalog window.",
+                          ),
+                        )
+                    }
                   >
-                    Set up pricing <ExternalLink size={12} />
+                    <ExternalLink size={14} />
+                    Browse TCGplayer
                   </button>
                 </div>
-              </div>
-            )}
-            {state.settings.cooldownUntil > Date.now() && (
-              <p className="collection-rate-note">
-                Provider cooldown until{" "}
-                {new Date(state.settings.cooldownUntil).toLocaleTimeString()}.
-                Search and refresh remain subject to your plan limits.
-              </p>
-            )}
-            <div className="catalog-budget">
-              <span>
-                20 results per page · Requests count toward your provider plan.
-              </span>
-              <span>
-                {state.settings.dailyRemaining === null
-                  ? ""
-                  : `${state.settings.dailyRemaining} requests left today`}
-                {state.settings.monthlyRemaining === null
-                  ? ""
-                  : ` · ${state.settings.monthlyRemaining} this billing month`}
-              </span>
-            </div>
-            {searched &&
-              !busy &&
-              state.settings.connected &&
-              lastSearch.searchQuery && (
-                <div className="catalog-results-heading" role="status">
+                <div className="catalog-source">
+                  <LinkIcon size={12} />
+                  <span>tcgplayer.com/categories</span>
+                  <span>·</span>
+                  <span>Price data: JustTCG · USD</span>
+                  {openProduct && (
+                    <button
+                      className="text-button"
+                      disabled={disabled}
+                      onClick={() => {
+                        setQuery(openProduct);
+                        void search(openProduct, 0);
+                      }}
+                    >
+                      Look up open product #{openProduct}
+                    </button>
+                  )}
+                </div>
+                <form
+                  className="catalog-search"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void search(query, 0);
+                  }}
+                >
+                  <label>
+                    <span>Card name, TCGplayer product URL, or product ID</span>
+                    <div className="search">
+                      <Search size={16} />
+                      <input
+                        aria-label="Search card catalog"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        required
+                        minLength={2}
+                        maxLength={2048}
+                        placeholder="e.g. Charizard, Black Lotus, or a product link"
+                      />
+                    </div>
+                  </label>
+                  <label>
+                    <span>Game</span>
+                    <select
+                      aria-label="Card game"
+                      value={game}
+                      onChange={(e) => setGame(e.target.value)}
+                    >
+                      <option value="">All games</option>
+                      {state.settings.games.map((g) => (
+                        <option value={g.id} key={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="primary"
+                    disabled={disabled || !state.settings.connected}
+                    type="submit"
+                  >
+                    <Search size={14} />
+                    Search
+                  </button>
+                </form>
+                {!state.settings.connected && (
+                  <div className="collection-setup">
+                    <ShieldCheck size={22} />
+                    <div>
+                      <h3>Connect a free JustTCG personal key</h3>
+                      <p>
+                        TCGplayer browsing works separately. A pricing
+                        connection enables in-app results and manual value
+                        refresh.
+                      </p>
+                      <button
+                        className="text-button"
+                        disabled={disabled}
+                        onClick={() => open({ kind: "connect" })}
+                      >
+                        Set up pricing <ExternalLink size={12} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {state.settings.cooldownUntil > Date.now() && (
+                  <p className="collection-rate-note">
+                    Provider cooldown until{" "}
+                    {new Date(
+                      state.settings.cooldownUntil,
+                    ).toLocaleTimeString()}
+                    . Search and refresh remain subject to your plan limits.
+                  </p>
+                )}
+                <div className="catalog-budget">
                   <span>
-                    <b>
-                      {cards.length}
-                      {hasMore ? "+" : ""} results
-                    </b>{" "}
-                    for “{lastSearch.searchQuery}”
+                    20 results per page · Requests count toward your provider
+                    plan.
                   </span>
-                  {lastSearch.searchQuery !== lastSearch.query &&
-                    !/^https?:/i.test(lastSearch.query) && (
-                      <span className="catalog-title-hint">
-                        Searched the card name from your full product title.
-                        Closest title/set matches appear first on this page.
+                  <span>
+                    {state.settings.dailyRemaining === null
+                      ? ""
+                      : `${state.settings.dailyRemaining} requests left today`}
+                    {state.settings.monthlyRemaining === null
+                      ? ""
+                      : ` · ${state.settings.monthlyRemaining} this billing month`}
+                  </span>
+                </div>
+                {searched &&
+                  !busy &&
+                  state.settings.connected &&
+                  lastSearch.searchQuery && (
+                    <div className="catalog-results-heading" role="status">
+                      <span>
+                        <b>
+                          {cards.length}
+                          {hasMore ? "+" : ""} results
+                        </b>{" "}
+                        for “{lastSearch.searchQuery}”
                       </span>
-                    )}
+                      {lastSearch.searchQuery !== lastSearch.query &&
+                        !/^https?:/i.test(lastSearch.query) && (
+                          <span className="catalog-title-hint">
+                            Searched the card name from your full product title.
+                            Closest title/set matches appear first on this page.
+                          </span>
+                        )}
+                    </div>
+                  )}
+                {!!cards.length && (
+                  <div className="catalog-grid">
+                    {cards.map((card) => (
+                      <CatalogResultCard
+                        key={card.id}
+                        card={card}
+                        disabled={disabled}
+                        onAdd={(variant) =>
+                          open({ kind: "add", card, variant })
+                        }
+                        onOpen={() =>
+                          card.productId &&
+                          external(
+                            "https://www.tcgplayer.com/product/" +
+                              card.productId,
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
+                {searched &&
+                  !cards.length &&
+                  !busy &&
+                  state.settings.connected && (
+                    <div className="empty">
+                      No catalog results to display. Check the query,
+                      connection, or any message above. Product coverage depends
+                      on the provider.
+                    </div>
+                  )}
+                {!!cards.length && (
+                  <div className="table-bottom">
+                    <span>
+                      Showing up to 20 matches · choose the exact printing,
+                      condition, and language
+                    </span>
+                    <div className="expense-pagination">
+                      <button
+                        disabled={disabled || offset === 0}
+                        onClick={() =>
+                          void search(
+                            lastSearch.query,
+                            Math.max(0, offset - 20),
+                            lastSearch.game,
+                          )
+                        }
+                      >
+                        Previous
+                      </button>
+                      <span>Page {Math.floor(offset / 20) + 1}</span>
+                      <button
+                        disabled={disabled || !hasMore}
+                        onClick={() =>
+                          void search(
+                            lastSearch.query,
+                            offset + 20,
+                            lastSearch.game,
+                          )
+                        }
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <p className="collection-browser-help">
+                  Artwork: TCGplayer product images where available. Prices:
+                  JustTCG, not TCGplayer lowest listings. Missing artwork does
+                  not prevent adding or refreshing a card. In the TCGplayer
+                  window, search normally and open a product. Choose{" "}
+                  <b>Catalog → Look up this product in Personal Toolbox</b> to
+                  bring it here. If the site blocks the in-app browser, use its
+                  menu to open the page in your system browser, then paste the
+                  product URL above.
+                </p>
+              </section>
+            )}
+            {tab === "comics" && (
+              <section className="panel collection-comics">
+                <BookOpen size={27} />
+                <div>
+                  <h2>A home for your comic books</h2>
+                  <p>
+                    Add comics and update estimates manually now. This section
+                    is separate from trading cards and ready for a future
+                    approved comic catalog/pricing adapter.
+                  </p>
+                </div>
+                <button
+                  className="secondary"
+                  disabled={disabled}
+                  onClick={() => open({ kind: "manual" })}
+                >
+                  <Plus size={14} />
+                  Add comic
+                </button>
+              </section>
+            )}
+            <section className="panel collection-inventory">
+              <div className="panel-heading">
+                <div>
+                  <h2>
+                    Collection inventory{" "}
+                    <span className="count">{items.length}</span>
+                  </h2>
+                  <p>
+                    Last recorded values, source timestamps, and ownership
+                    details in one place.
+                  </p>
+                </div>
+                <span className="gold">
+                  {money(
+                    items.reduce(
+                      (n, i) => n + (i.valueCents ?? 0) * i.quantity,
+                      0,
+                    ),
+                  )}{" "}
+                  known value
+                </span>
+              </div>
+              <div className="table-toolbar">
+                <label className="search">
+                  <Search size={15} />
+                  <input
+                    aria-label="Search owned collection"
+                    value={filter}
+                    onChange={(e) => {
+                      setFilter(e.target.value);
+                      setPage(1);
+                    }}
+                    placeholder="Search your items, set, game, or variant…"
+                  />
+                </label>
+                <span className="collection-valuation-note">
+                  Estimates are not guaranteed sale prices.
+                </span>
+              </div>
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ITEM / VARIANT</th>
+                      <th>QTY</th>
+                      <th>UNIT COST</th>
+                      <th>UNIT VALUE</th>
+                      <th>VALUE STATUS</th>
+                      <th className="right">ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items
+                      .slice((current - 1) * 25, current * 25)
+                      .map((item) => (
+                        <tr key={item.id}>
+                          <td>
+                            <div className="collection-owned-name">
+                              {item.imageData ||
+                              (item.provider === "justtcg" &&
+                                item.productId) ? (
+                                <CardArtwork
+                                  localImage={item.imageData}
+                                  productId={
+                                    item.provider === "justtcg"
+                                      ? item.productId
+                                      : null
+                                  }
+                                  name={item.name}
+                                  compact
+                                />
+                              ) : (
+                                <span className="collection-art">
+                                  {item.collectionType === "comics" ? (
+                                    <BookOpen size={25} />
+                                  ) : (
+                                    <Layers size={25} />
+                                  )}
+                                </span>
+                              )}
+                              <div>
+                                <strong>{item.name}</strong>
+                                {item.purchaseDate && (
+                                  <small>Purchased {item.purchaseDate}</small>
+                                )}
+                                <small>
+                                  {[item.category, item.setName]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                </small>
+                                <small>
+                                  {item.provider === "justtcg"
+                                    ? [
+                                        item.printing,
+                                        item.condition,
+                                        item.language,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" · ")
+                                    : "Manual valuation"}
+                                </small>
+                                {item.referenceUrl &&
+                                  item.provider === "justtcg" && (
+                                    <button
+                                      className="text-button"
+                                      disabled={disabled}
+                                      onClick={() =>
+                                        external(item.referenceUrl!)
+                                      }
+                                    >
+                                      TCGplayer product{" "}
+                                      <ExternalLink size={10} />
+                                    </button>
+                                  )}
+                              </div>
+                            </div>
+                          </td>
+                          <td>{item.quantity}</td>
+                          <td>{money(item.purchaseCents)}</td>
+                          <td className="total">
+                            {item.valueCents === null
+                              ? "Unavailable"
+                              : money(item.valueCents)}
+                            {item.valueCents === null &&
+                              item.lastKnownCents !== null && (
+                                <small>
+                                  Last recorded: {money(item.lastKnownCents)}
+                                </small>
+                              )}
+                          </td>
+                          <td>
+                            <span
+                              className={
+                                "badge " +
+                                (item.error
+                                  ? "processing"
+                                  : item.state === "current"
+                                    ? "delivered"
+                                    : item.state === "manual"
+                                      ? ""
+                                      : "processing")
+                              }
+                            >
+                              {item.error
+                                ? "Refresh failed"
+                                : item.state === "current"
+                                  ? "JustTCG quote"
+                                  : item.state === "manual"
+                                    ? "Manual estimate"
+                                    : item.state === "expired"
+                                      ? "Expired quote"
+                                      : "No current quote"}
+                            </span>
+                            <small>
+                              {item.observedAt
+                                ? "Source: " +
+                                  new Date(item.observedAt).toLocaleString()
+                                : item.provider === "justtcg"
+                                  ? "Source time unavailable"
+                                  : "User-entered value"}
+                            </small>
+                            <small>
+                              {item.checkedAt
+                                ? "Checked: " +
+                                  new Date(item.checkedAt).toLocaleString()
+                                : "Not checked online"}
+                            </small>
+                            {item.error && (
+                              <small className="collection-item-error">
+                                {item.error}
+                              </small>
+                            )}
+                          </td>
+                          <td>
+                            <div className="collection-row-actions">
+                              <button
+                                aria-label={"Sell item " + item.name}
+                                title="Create a shared eBay / Mercari listing draft"
+                                disabled={disabled}
+                                onClick={() => onSell(item.id)}
+                              >
+                                <Tag size={14} />
+                              </button>
+                              <button
+                                aria-label={"Refresh value " + item.name}
+                                title={
+                                  item.provider === "justtcg"
+                                    ? "Fetch latest available provider quote"
+                                    : "Manual item: edit its estimate"
+                                }
+                                disabled={
+                                  disabled ||
+                                  item.provider !== "justtcg" ||
+                                  !state.settings.connected
+                                }
+                                onClick={() =>
+                                  void action(
+                                    () =>
+                                      window.toolbox!.refreshCollection(
+                                        item.id,
+                                      ),
+                                    "Value refreshed.",
+                                  )
+                                }
+                              >
+                                <RefreshCw size={14} />
+                              </button>
+                              <button
+                                aria-label={"Value history " + item.name}
+                                title="Value history"
+                                disabled={disabled}
+                                onClick={() =>
+                                  void window
+                                    .toolbox!.collectionHistory(item.id)
+                                    .then((quotes) =>
+                                      open({ kind: "history", item, quotes }),
+                                    )
+                                    .catch(() =>
+                                      setError("Could not load value history."),
+                                    )
+                                }
+                              >
+                                <History size={14} />
+                              </button>
+                              <button
+                                aria-label={"Edit item " + item.name}
+                                title="Edit ownership and photo"
+                                disabled={disabled}
+                                onClick={() => open({ kind: "edit", item })}
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                aria-label={"Delete item " + item.name}
+                                title="Remove from collection"
+                                disabled={disabled}
+                                onClick={() => open({ kind: "delete", item })}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              {!items.length && (
+                <div className="expense-empty">
+                  <span>
+                    <Layers size={28} />
+                  </span>
+                  <h2>
+                    {loading
+                      ? "Loading collection…"
+                      : "Your collection starts here"}
+                  </h2>
+                  <p>
+                    {tab === "cards"
+                      ? "Search above, select a variant, and add the quantity you own."
+                      : "Add an item with its quantity, unit purchase cost, and optional value."}
+                  </p>
                 </div>
               )}
-            {!!cards.length && (
-              <div className="catalog-grid">
-                {cards.map((card) => (
-                  <CatalogResultCard
-                    key={card.id}
-                    card={card}
-                    disabled={disabled}
-                    onAdd={(variant) => open({ kind: "add", card, variant })}
-                    onOpen={() =>
-                      card.productId &&
-                      external(
-                        "https://www.tcgplayer.com/product/" + card.productId,
-                      )
-                    }
-                  />
-                ))}
-              </div>
-            )}
-            {searched && !cards.length && !busy && state.settings.connected && (
-              <div className="empty">
-                No catalog results to display. Check the query, connection, or
-                any message above. Product coverage depends on the provider.
-              </div>
-            )}
-            {!!cards.length && (
               <div className="table-bottom">
                 <span>
-                  Showing up to 20 matches · choose the exact printing,
-                  condition, and language
+                  {items.length} entries · USD · unavailable values excluded
+                  from totals
                 </span>
                 <div className="expense-pagination">
                   <button
-                    disabled={disabled || offset === 0}
-                    onClick={() =>
-                      void search(
-                        lastSearch.query,
-                        Math.max(0, offset - 20),
-                        lastSearch.game,
-                      )
-                    }
+                    disabled={current <= 1}
+                    onClick={() => setPage(current - 1)}
                   >
                     Previous
                   </button>
-                  <span>Page {Math.floor(offset / 20) + 1}</span>
+                  <span>
+                    {current} / {lastPage}
+                  </span>
                   <button
-                    disabled={disabled || !hasMore}
-                    onClick={() =>
-                      void search(
-                        lastSearch.query,
-                        offset + 20,
-                        lastSearch.game,
-                      )
-                    }
+                    disabled={current >= lastPage}
+                    onClick={() => setPage(current + 1)}
                   >
                     Next
                   </button>
                 </div>
               </div>
-            )}
-            <p className="collection-browser-help">
-              Artwork: TCGplayer product images where available. Prices:
-              JustTCG, not TCGplayer lowest listings. Missing artwork does not
-              prevent adding or refreshing a card. In the TCGplayer window,
-              search normally and open a product. Choose{" "}
-              <b>Catalog → Look up this product in Personal Toolbox</b> to bring
-              it here. If the site blocks the in-app browser, use its menu to
-              open the page in your system browser, then paste the product URL
-              above.
-            </p>
-          </section>
+            </section>
+          </>
         )}
-        {tab === "comics" && (
-          <section className="panel collection-comics">
-            <BookOpen size={27} />
-            <div>
-              <h2>A home for your comic books</h2>
-              <p>
-                Add comics and update estimates manually now. This section is
-                separate from trading cards and ready for a future approved
-                comic catalog/pricing adapter.
-              </p>
-            </div>
-            <button
-              className="secondary"
-              disabled={disabled}
-              onClick={() => open({ kind: "manual" })}
-            >
-              <Plus size={14} />
-              Add comic
-            </button>
-          </section>
-        )}
-        <section className="panel collection-inventory">
-          <div className="panel-heading">
-            <div>
-              <h2>
-                Collection inventory{" "}
-                <span className="count">{items.length}</span>
-              </h2>
-              <p>
-                Last recorded values, source timestamps, and ownership details
-                in one place.
-              </p>
-            </div>
-            <span className="gold">
-              {money(
-                items.reduce((n, i) => n + (i.valueCents ?? 0) * i.quantity, 0),
-              )}{" "}
-              known value
-            </span>
-          </div>
-          <div className="table-toolbar">
-            <label className="search">
-              <Search size={15} />
-              <input
-                aria-label="Search owned collection"
-                value={filter}
-                onChange={(e) => {
-                  setFilter(e.target.value);
-                  setPage(1);
-                }}
-                placeholder="Search your items, set, game, or variant…"
-              />
-            </label>
-            <span className="collection-valuation-note">
-              Estimates are not guaranteed sale prices.
-            </span>
-          </div>
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>ITEM / VARIANT</th>
-                  <th>QTY</th>
-                  <th>UNIT COST</th>
-                  <th>UNIT VALUE</th>
-                  <th>VALUE STATUS</th>
-                  <th className="right">ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.slice((current - 1) * 25, current * 25).map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <div className="collection-owned-name">
-                        {item.imageData ||
-                        (item.provider === "justtcg" && item.productId) ? (
-                          <CardArtwork
-                            localImage={item.imageData}
-                            productId={
-                              item.provider === "justtcg"
-                                ? item.productId
-                                : null
-                            }
-                            name={item.name}
-                            compact
-                          />
-                        ) : (
-                          <span className="collection-art">
-                            {item.collectionType === "comics" ? (
-                              <BookOpen size={25} />
-                            ) : (
-                              <Layers size={25} />
-                            )}
-                          </span>
-                        )}
-                        <div>
-                          <strong>{item.name}</strong>
-                          <small>
-                            {[item.category, item.setName]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </small>
-                          <small>
-                            {item.provider === "justtcg"
-                              ? [item.printing, item.condition, item.language]
-                                  .filter(Boolean)
-                                  .join(" · ")
-                              : "Manual valuation"}
-                          </small>
-                          {item.referenceUrl && item.provider === "justtcg" && (
-                            <button
-                              className="text-button"
-                              disabled={disabled}
-                              onClick={() => external(item.referenceUrl!)}
-                            >
-                              TCGplayer product <ExternalLink size={10} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td>{item.quantity}</td>
-                    <td>{money(item.purchaseCents)}</td>
-                    <td className="total">
-                      {item.valueCents === null
-                        ? "Unavailable"
-                        : money(item.valueCents)}
-                      {item.valueCents === null &&
-                        item.lastKnownCents !== null && (
-                          <small>
-                            Last recorded: {money(item.lastKnownCents)}
-                          </small>
-                        )}
-                    </td>
-                    <td>
-                      <span
-                        className={
-                          "badge " +
-                          (item.error
-                            ? "processing"
-                            : item.state === "current"
-                              ? "delivered"
-                              : item.state === "manual"
-                                ? ""
-                                : "processing")
-                        }
-                      >
-                        {item.error
-                          ? "Refresh failed"
-                          : item.state === "current"
-                            ? "JustTCG quote"
-                            : item.state === "manual"
-                              ? "Manual estimate"
-                              : item.state === "expired"
-                                ? "Expired quote"
-                                : "No current quote"}
-                      </span>
-                      <small>
-                        {item.observedAt
-                          ? "Source: " +
-                            new Date(item.observedAt).toLocaleString()
-                          : item.provider === "justtcg"
-                            ? "Source time unavailable"
-                            : "User-entered value"}
-                      </small>
-                      <small>
-                        {item.checkedAt
-                          ? "Checked: " +
-                            new Date(item.checkedAt).toLocaleString()
-                          : "Not checked online"}
-                      </small>
-                      {item.error && (
-                        <small className="collection-item-error">
-                          {item.error}
-                        </small>
-                      )}
-                    </td>
-                    <td>
-                      <div className="collection-row-actions">
-                        <button
-                          aria-label={"Sell item " + item.name}
-                          title="Create a shared eBay / Mercari listing draft"
-                          disabled={disabled}
-                          onClick={() => onSell(item.id)}
-                        >
-                          <Tag size={14} />
-                        </button>
-                        <button
-                          aria-label={"Refresh value " + item.name}
-                          title={
-                            item.provider === "justtcg"
-                              ? "Fetch latest available provider quote"
-                              : "Manual item: edit its estimate"
-                          }
-                          disabled={
-                            disabled ||
-                            item.provider !== "justtcg" ||
-                            !state.settings.connected
-                          }
-                          onClick={() =>
-                            void action(
-                              () => window.toolbox!.refreshCollection(item.id),
-                              "Value refreshed.",
-                            )
-                          }
-                        >
-                          <RefreshCw size={14} />
-                        </button>
-                        <button
-                          aria-label={"Value history " + item.name}
-                          title="Value history"
-                          disabled={disabled}
-                          onClick={() =>
-                            void window
-                              .toolbox!.collectionHistory(item.id)
-                              .then((quotes) =>
-                                open({ kind: "history", item, quotes }),
-                              )
-                              .catch(() =>
-                                setError("Could not load value history."),
-                              )
-                          }
-                        >
-                          <History size={14} />
-                        </button>
-                        <button
-                          aria-label={"Edit item " + item.name}
-                          title="Edit ownership and photo"
-                          disabled={disabled}
-                          onClick={() => open({ kind: "edit", item })}
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          aria-label={"Delete item " + item.name}
-                          title="Remove from collection"
-                          disabled={disabled}
-                          onClick={() => open({ kind: "delete", item })}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {!items.length && (
-            <div className="expense-empty">
-              <span>
-                <Layers size={28} />
-              </span>
-              <h2>
-                {loading
-                  ? "Loading collection…"
-                  : "Your collection starts here"}
-              </h2>
-              <p>
-                {tab === "cards"
-                  ? "Search above, select a variant, and add the quantity you own."
-                  : "Add an item with its quantity, unit purchase cost, and optional value."}
-              </p>
-            </div>
-          )}
-          <div className="table-bottom">
-            <span>
-              {items.length} entries · USD · unavailable values excluded from
-              totals
-            </span>
-            <div className="expense-pagination">
-              <button
-                disabled={current <= 1}
-                onClick={() => setPage(current - 1)}
-              >
-                Previous
-              </button>
-              <span>
-                {current} / {lastPage}
-              </span>
-              <button
-                disabled={current >= lastPage}
-                onClick={() => setPage(current + 1)}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </section>
       </div>
       {modal && (
         <CollectionDialog
@@ -1042,7 +1096,9 @@ export default function CollectionPanel({
           ) : modal.kind === "manual" || modal.kind === "edit" ? (
             <ManualItemForm
               item={modal.kind === "edit" ? modal.item : undefined}
-              defaultTab={tab === "all" ? "other" : tab}
+              defaultTab={
+                tab === "all" || tab === "outstanding" ? "other" : tab
+              }
               busy={disabled}
               onCancel={() => setModal(null)}
               onSave={(input) =>

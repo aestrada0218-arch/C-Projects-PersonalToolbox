@@ -1,3 +1,5 @@
+import { MailRepository } from "./mailboxes/store";
+import { mailMigration } from "./mailboxes/model";
 import { CollectionRepository } from "./collection/store";
 import { collectionMigration } from "./collection/model";
 import { ShippingRepository } from "./shipping/store";
@@ -42,6 +44,10 @@ export const orderSchema = z
   })
   .strict();
 export class Store {
+  readonly mail = new MailRepository(
+    () => this.db,
+    (fn) => this.mutate(fn),
+  );
   readonly selling = new SellingRepository(
     () => this.db,
     (fn) => this.mutate(fn),
@@ -84,7 +90,7 @@ export class Store {
     const version =
       this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
     // v0.7 only added separate entry tables; retain them when rolling back.
-    if (Number(version) > 8) throw new Error("Unsupported database version");
+    if (Number(version) > 9) throw new Error("Unsupported database version");
     if (Number(version) < 1) {
       this.db.run(
         `BEGIN; CREATE TABLE orders(id TEXT PRIMARY KEY,name TEXT NOT NULL,store TEXT NOT NULL,category TEXT NOT NULL,total REAL NOT NULL CHECK(total>=0),status TEXT NOT NULL CHECK(status IN ('Delivered','In transit','Processing','Cancelled')),date TEXT NOT NULL); CREATE TABLE collection(id TEXT PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),purchase REAL NOT NULL,market REAL NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO migrations VALUES(1);`,
@@ -193,7 +199,23 @@ export class Store {
       );
       this.persist();
     }
+    if (Number(version) < 9) {
+      if (
+        this.path &&
+        Number(version) > 0 &&
+        !existsSync(this.path + ".pre-mailboxes-v8.bak")
+      )
+        writeFileSync(this.path + ".pre-mailboxes-v8.bak", this.db.export(), {
+          flag: "wx",
+          mode: 0o600,
+        });
+      this.db.run(
+        "BEGIN;" + mailMigration + "INSERT INTO migrations VALUES(9);COMMIT;",
+      );
+      this.persist();
+    }
   }
+
   private seed() {
     const names = [
       ["Air Jordan 1 Retro High", "Nike", "Sneakers", 180],
@@ -284,6 +306,15 @@ export class Store {
     }
     return this.snapshot();
   }
+  deleteOrder(input: unknown) {
+    const id = z.string().uuid().parse(input);
+    this.mutate(() => {
+      if (!this.snapshot().orders.some((o) => o.id === id))
+        throw Error("Order missing");
+      this.db.run("DELETE FROM orders WHERE id=?", [id]);
+    });
+    return this.snapshot();
+  }
   private mutate<T>(fn: () => T): T {
     const before = this.db.export();
     this.db.run("BEGIN");
@@ -315,8 +346,6 @@ export class Store {
   }
   connectInbox(email: string, scan: ScanResult) {
     this.mutate(() => {
-      if (this.inboxAccount()?.email !== email)
-        this.db.run("DELETE FROM shipments; DELETE FROM inbox_updates");
       this.db.run(
         "INSERT OR REPLACE INTO inbox_account(id,email,auto) VALUES(1,?,0)",
         [email],
@@ -379,9 +408,7 @@ export class Store {
   }
   disconnectInbox() {
     this.mutate(() => {
-      this.db.run(
-        "DELETE FROM inbox_updates; DELETE FROM shipments; DELETE FROM inbox_account",
-      );
+      this.db.run("DELETE FROM inbox_account");
       this.shipping.unbindAccountInTransaction();
     });
   }

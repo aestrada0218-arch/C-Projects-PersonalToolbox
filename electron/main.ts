@@ -1,3 +1,4 @@
+import { MailboxService } from "./mailboxes/service";
 import { net } from "electron";
 import { CollectionService, type PricingSecret } from "./collection/service";
 import { JustTcgProvider } from "./collection/justtcg";
@@ -20,6 +21,7 @@ let stopExpenseTimer: (() => void) | undefined;
 let collectionService: CollectionService;
 let tcgBrowser: TcgCatalogBrowser;
 let inbox: InboxService;
+let mailboxes: MailboxService;
 let store: Store;
 let window: BrowserWindow;
 const dev = process.argv.includes("--dev") && !app.isPackaged;
@@ -106,24 +108,77 @@ else {
         () => window,
         handle,
       );
-      inbox = new InboxService(
+      const primaryProvider = new GmailImapProvider();
+      inbox = new InboxService(store, new WindowsCredentialVault(), {
+        scan: (secret) => primaryProvider.scan(secret),
+        cancel: () => primaryProvider.cancel(),
+      });
+      mailboxes = new MailboxService(
         store,
         new WindowsCredentialVault(),
-        new GmailImapProvider(),
+        (id) => new WindowsCredentialVault("PersonalToolbox/IMAP/" + id),
       );
-      handle("toolbox:inbox-state", () => inbox.state());
-      handle("toolbox:connect-gmail", (input) => inbox.connect(input));
+      handle("toolbox:mailboxes-state", () => mailboxes.state());
+      handle("toolbox:mailboxes-connect", (input) => mailboxes.connect(input));
+      handle("toolbox:mailboxes-disconnect", (id) => mailboxes.disconnect(id));
+      handle("toolbox:mailboxes-enabled", (input) =>
+        mailboxes.setEnabled(input),
+      );
+      handle("toolbox:mailboxes-scan", (id) => mailboxes.refresh(id));
+      handle("toolbox:outstanding-receive", (input) =>
+        mailboxes.receive(input),
+      );
+      mailboxes.start();
+      handle("toolbox:inbox-state", () => ({
+        ...inbox.state(),
+        syncing: inbox.state().syncing || mailboxes.state().busy,
+      }));
+      handle("toolbox:connect-gmail", (input) =>
+        mailboxes.state().busy
+          ? {
+              ok: false,
+              error: "Wait for the active mailbox scan to finish.",
+              state: inbox.state(),
+            }
+          : inbox.connect(input),
+      );
       handle("toolbox:refresh-inbox", () => inbox.refresh());
-      handle("toolbox:disconnect-gmail", () => inbox.disconnect());
+      handle("toolbox:disconnect-gmail", () =>
+        mailboxes.state().busy
+          ? {
+              ok: false,
+              error: "Wait for the active mailbox scan to finish.",
+              state: inbox.state(),
+            }
+          : inbox.disconnect(),
+      );
       handle("toolbox:inbox-auto", (value) => inbox.setAuto(value));
       handle("toolbox:link-email-update", (input) => inbox.linkUpdate(input));
       handle("toolbox:link-shipment", (input) => inbox.link(input));
       inbox.start();
-      handle("toolbox:shipping-state", () => inbox.shippingState());
-      handle("toolbox:shipping-check", () => inbox.refreshSales());
-      handle("toolbox:shipping-monitor", (input) =>
-        inbox.setShippingMonitor(input),
-      );
+      const shippingState = () => ({
+        ...inbox.shippingState(),
+        accountEmail:
+          mailboxes
+            .state()
+            .accounts.map((a) => a.email)
+            .join(", ") || null,
+        syncing: inbox.state().syncing || mailboxes.state().busy,
+      });
+      handle("toolbox:shipping-state", shippingState);
+      handle("toolbox:shipping-check", async () => {
+        const result = await mailboxes.refresh();
+        return {
+          ok: result.ok,
+          error: result.error,
+          state: shippingState(),
+        };
+      });
+      handle("toolbox:shipping-monitor", (input) => {
+        const result = inbox.setShippingMonitor(input);
+        if (result.ok) store.mail.resetSalesSchedule();
+        return { ...result, state: shippingState() };
+      });
       handle("toolbox:shipping-add", (input) =>
         inbox.shippingAction(() => store.shipping.add(input)),
       );
@@ -134,6 +189,7 @@ else {
         inbox.shippingAction(() => store.shipping.remove(id)),
       );
       handle("toolbox:snapshot", () => store.snapshot());
+      handle("toolbox:delete-order", (id) => store.deleteOrder(id));
       handle("toolbox:add-order", (input) => store.addOrder(input));
       handle("toolbox:export-orders", async () => {
         const result = await dialog.showSaveDialog(window, {
@@ -191,6 +247,7 @@ else {
     collectionService?.stop();
     tcgBrowser?.close();
     stopExpenseTimer?.();
+    mailboxes?.stop();
     inbox?.stop();
     store?.close();
   });

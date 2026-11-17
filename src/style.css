@@ -2648,3 +2648,96 @@ select:disabled {
 .selling-specific-row > button {
   margin-top: 18px;
 }
+
+.mailbox-manager,
+.outstanding-orders {
+  margin-top: 20px;
+}
+.mailbox-manager h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.mailbox-manager td,
+.outstanding-orders td {
+  vertical-align: top;
+}
+.mailbox-manager td small,
+.outstanding-orders td small {
+  display: block;
+  color: #9697a1;
+  font-size: 11px;
+  margin-top: 6px;
+  max-width: 340px;
+  overflow-wrap: anywhere;
+}
+.mailbox-manager button,
+.outstanding-orders button,
+.mail-dialog button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.mailbox-manager button:not(.text-button):not(.primary),
+.outstanding-orders button:not(.primary),
+.mail-dialog button:not(.primary) {
+  background: #1c1d23;
+  border: 1px solid #35363e;
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 12px;
+}
+.mail-note {
+  color: #a0a1ac;
+  font-size: 12px;
+  line-height: 1.7;
+  padding: 0 20px 15px;
+}
+.mail-note svg {
+  display: inline;
+  vertical-align: middle;
+  margin-right: 5px;
+}
+.mail-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #b6b6c0;
+}
+.mail-toggle input {
+  width: auto;
+}
+.mail-dialog {
+  width: min(580px, 95vw);
+  max-height: 90vh;
+  overflow: auto;
+}
+.mail-dialog fieldset {
+  display: grid;
+  gap: 15px;
+}
+.mail-dialog label {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+}
+.mail-dialog input,
+.mail-dialog select {
+  width: 100%;
+}
+.mail-dialog .mail-note {
+  padding: 0;
+}
+.outstanding-orders .empty {
+  text-align: center;
+  padding: 40px 20px;
+}
+.outstanding-orders .empty svg {
+  margin: 0 auto 12px;
+  color: #d7b569;
+}
+.outstanding-orders table {
+  min-width: 900px;
+}

@@ -1,4 +1,4 @@
-# Personal Toolbox · v0.6.0
+# Personal Toolbox · v0.8.0
 
 A Windows desktop app built with Electron, React, TypeScript, Vite, Tailwind CSS, SQLite (sql.js), Recharts, and Playwright. Original dark-and-gold interface. Version 0.6 adds direct eBay fixed-price selling, shared drafts, exact Mercari listing links, and persistent cross-listing follow-ups. Version 0.5 added eBay-email shipping tasks with ship-by dates and scheduled Gmail checks. Version 0.4.1 added illustrated card search and full-title matching. Version 0.4 added a multi-section collection, JustTCG catalog/pricing, saved quote history, and an isolated interactive TCGplayer catalog browser. The categorized expense ledger and recurring bookkeeping remain available.
 
@@ -263,3 +263,37 @@ Remove-Item .\src\EntryRunnerPanel.tsx, .\src\entry-types.ts, .\tests\entry.test
 ```
 
 Then copy the extracted source contents containing `package.json` over the project, replacing existing files and keeping `node_modules`. Run `npm install` followed by `npm run dev`. The `rollback.test.ts` regression test verifies that a v0.7 database opens and retains entry tables while existing app data remains writable.
+
+## v0.8 — outstanding purchases, multiple inboxes and order deletion
+
+The Entry Runner remains removed. Proxies and Profiles are no longer shown in navigation.
+
+- **Orders:** use the trash button to review and confirm deletion. Analytics updates immediately. Linked shipment/email records remain saved with their order link cleared; expenses and collection items are not deleted.
+- **Collection → Outstanding orders:** click **Scan last 365 days** after connecting Gmail. The primary Gmail account's receipt scan locates Gmail's All Mail folder when available, including archived receipts; it falls back to INBOX when All Mail is unavailable. Other IMAP accounts use the folder you configure.
+- Matching requires the exact parsed sender `service@paypal.com`, the **Payment to** section identifying **Minky’s Designs** and `Minkysdesigns@gmail.com`, a completed payment status, transaction ID, purchase date and valid USD line items. The app extracts description, unit price, quantity and amount. HTML is converted locally without fetching images. Forwarded messages with a different outer sender are excluded. Unsupported or unmatched messages appear in scan counts, not guessed purchases.
+- Click **Receive / move** to receive all or part of a line's quantity into Cards, Comic books or Other collectibles. Original purchase dates and unit costs are retained. A received item starts with unknown market value and can be updated through the existing collection controls. Shipping-charge lines are retained separately and cannot be moved into the collection. Taxes, discounts and receipt totals are not apportioned into unit prices; imported amounts are the original line amounts, not the final amount charged by PayPal.
+- A payment email does not establish whether an item has already shipped or arrived. Historical imports await your receipt confirmation. Use **Include received items** to review received history. Transaction/line identities prevent duplicates across repeated scans and multiple mailboxes; receiving is transactional and request IDs prevent repeated clicks/retries from duplicating a move.
+
+### Connect multiple IMAP inboxes on Windows
+
+Your existing primary Gmail connection is preserved. In **Inbox → Connected inboxes**, choose **Add IMAP inbox** as many times as needed. Choose Gmail or Other IMAP, enter a label, email, verified-TLS hostname/port (normally 993), folder and provider app password. Gmail defaults to `[Gmail]/All Mail`; change the folder if your account uses a different name. Custom servers must support password-based IMAP over implicit TLS; OAuth-only providers need a separate future adapter. TLS verification cannot be disabled. A normal Gmail password does not work; use a Google app password with two-step verification.
+
+Each additional inbox has its own Windows Credential Manager entry, scan cursor, monitoring toggle and error status. There is no imposed account-count limit. Password fields clear after submission and saved passwords are never returned to the renderer or written to SQLite/logs. Each account is verified read-only before credentials are saved. Disconnect removes credentials and stops monitoring, retaining imported purchases and message history. Primary Gmail can be disconnected using its existing account card.
+
+Enabled accounts monitor while the app is open, on a 10-minute schedule. Primary Gmail uses its existing automatic-check switch. Additional accounts use their **Monitor** checkbox. The existing Tasks sales-monitor switch and interval still control eBay sale extraction independently of the primary Gmail shipment auto-check switch. Each inbox has separate sales progress and scheduling. The mailbox scanner also checks sales for connected inboxes and merges shipment/order updates from additional accounts into the Inbox review lists. Mail is read using verified TLS and read-only IMAP; it is never marked read, deleted, or sent by this integration.
+
+PayPal history uses ascending UID batches of at most 100 messages, with a last-365-days search and persisted per-account progress. Larger requested histories continue at the next background tick while the app stays open; **Scan** continues saved progress. Repeated scans do not duplicate existing or received lines. Oversized messages (over 2 MiB), unsupported formats and unrelated PayPal receipts are counted as skipped/unmatched. Review scan counts and your original emails for anything not recognized. No Gmail account was accessed during development; the first real scan runs locally after you connect and request it.
+
+### Update and verification
+
+Close the app, copy the extracted source contents containing `package.json` over `C:\Projects\PersonalToolbox`, replacing existing files and keeping `node_modules`, then run:
+
+```powershell
+cd C:\Projects\PersonalToolbox
+npm install
+npm run dev
+```
+
+The database migration creates a `.pre-mailboxes-v8.bak` backup and retains existing orders, expenses, collection, mailbox settings and any unused v0.7 entry tables. It adds mailbox metadata, receipt cursors, outstanding lines, move receipts and collection purchase dates. Do not restore an older backup merely to update.
+
+Run `npm run build`, `npm test` and `npm run test:e2e` to validate. New tests cover the screenshot's line items, HTML receipts, exact sender/payee filtering, 365-day IMAP queries, bounded cursor progression, cross-inbox deduplication, 12 separate mailbox credentials, partial/idempotent receiving, order deletion/unlinking, persistence and desktop controls. IMAP and credential tests use mocks; Windows Credential Manager and real provider authentication require verification on your computer.

@@ -269,7 +269,7 @@ export default function TasksPanel({
             <h2>eBay sales monitor</h2>
             <p>
               {state.accountEmail
-                ? `Connected Gmail: ${state.accountEmail}`
+                ? `Connected inboxes: ${state.accountEmail}`
                 : "Connect Gmail in Inbox to turn sale emails into tasks."}
             </p>
           </div>

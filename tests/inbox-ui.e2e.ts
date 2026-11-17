@@ -110,9 +110,7 @@ test("Gmail connection UI, automatic checks, refresh, order review, and disconne
     await expect(
       page.getByText("Remove the saved Gmail credential", { exact: false }),
     ).toBeVisible();
-    await page
-      .getByRole("button", { name: "Disconnect and clear inbox" })
-      .click();
+    await page.getByRole("button", { name: "Disconnect Gmail" }).click();
     await expect(
       page.getByRole("heading", { name: "Connect your Gmail account" }),
     ).toBeVisible();

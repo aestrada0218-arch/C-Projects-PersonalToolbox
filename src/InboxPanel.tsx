@@ -1,3 +1,4 @@
+import { MailboxManager } from "./MailboxPanels";
 import { useEffect, useState } from "react";
 import {
   Mail,
@@ -215,8 +216,9 @@ export default function InboxPanel({
         {confirmDisconnect && (
           <div className="disconnect-confirm">
             <p>
-              Remove the saved Gmail credential and all detected shipments from
-              this inbox? Existing orders and their applied statuses will stay.
+              Remove the saved Gmail credential? Imported shipments, purchases
+              and existing orders will stay. Monitoring for other inboxes
+              continues.
             </p>
             <button
               disabled={disabled}
@@ -230,11 +232,11 @@ export default function InboxPanel({
               onClick={() =>
                 void action(
                   () => window.toolbox!.disconnectGmail(),
-                  "Gmail disconnected. Saved credential and shipment inbox removed.",
+                  "Gmail disconnected. Saved credentials removed; imported data retained.",
                 )
               }
             >
-              Disconnect and clear inbox
+              Disconnect Gmail
             </button>
           </div>
         )}
@@ -252,6 +254,7 @@ export default function InboxPanel({
           />
         )}
       </section>
+      <MailboxManager />
       <section className="panel inbox-help">
         <h3>Set up Gmail in three steps</h3>
         <ol>

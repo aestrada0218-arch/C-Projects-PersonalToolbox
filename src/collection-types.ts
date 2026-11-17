@@ -22,6 +22,7 @@ export type CatalogCard = {
   checkedAt: string;
 };
 export type OwnedCollectible = {
+  purchaseDate?: string | null;
   id: string;
   name: string;
   category: string;

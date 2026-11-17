@@ -2,6 +2,19 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "toolbox",
   Object.freeze({
+    mailboxState: () => ipcRenderer.invoke("toolbox:mailboxes-state"),
+    connectMailbox: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:mailboxes-connect", input),
+    disconnectMailbox: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:mailboxes-disconnect", id),
+    setMailboxEnabled: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:mailboxes-enabled", input),
+    scanMailboxes: (id?: unknown) =>
+      ipcRenderer.invoke("toolbox:mailboxes-scan", id),
+    receiveOutstanding: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:outstanding-receive", input),
+    deleteOrder: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:delete-order", id),
     sellingState: () => ipcRenderer.invoke("toolbox:selling-state"),
     sellingCategory: (id: unknown) =>
       ipcRenderer.invoke("toolbox:selling-category", id),

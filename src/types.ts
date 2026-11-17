@@ -1,4 +1,9 @@
 import type {
+  MailboxState,
+  MailboxResult,
+  MailboxInput,
+} from "./mailbox-types";
+import type {
   CollectionState,
   CollectionResult,
   CatalogResult,
@@ -56,6 +61,21 @@ export type Snapshot = {
 };
 export type NewOrder = Omit<Order, "id">;
 export interface ToolboxAPI {
+  mailboxState(): Promise<MailboxState>;
+  connectMailbox(input: MailboxInput): Promise<MailboxResult>;
+  disconnectMailbox(id: string): Promise<MailboxResult>;
+  setMailboxEnabled(input: {
+    id: string;
+    enabled: boolean;
+  }): Promise<MailboxResult>;
+  scanMailboxes(id?: string): Promise<MailboxResult>;
+  receiveOutstanding(input: {
+    requestId: string;
+    id: string;
+    quantity: number;
+    tab: "cards" | "comics" | "other";
+  }): Promise<MailboxResult>;
+  deleteOrder(id: string): Promise<Snapshot>;
   sellingState(): Promise<SellingState>;
   sellingCategory(
     id: string,

@@ -28,8 +28,8 @@ export class GmailImapProvider implements EmailProvider {
   }
   async scanSales(secret: MailSecret, cursor: SalesCursor): Promise<SalesScan> {
     const client = new ImapFlow({
-      host: "imap.gmail.com",
-      port: 993,
+      host: secret.host || "imap.gmail.com",
+      port: secret.port || 993,
       secure: true,
       auth: { user: secret.email, pass: secret.appPassword },
       logger: false,
@@ -45,7 +45,7 @@ export class GmailImapProvider implements EmailProvider {
     const deadline = setTimeout(() => client.close(), 120000);
     try {
       await client.connect();
-      const lock = await client.getMailboxLock("INBOX", { readOnly: true });
+      const lock = await client.getMailboxLock(secret.folder || "INBOX", { readOnly: true });
       try {
         const validity = client.mailbox
           ? String(client.mailbox.uidValidity)
@@ -148,8 +148,8 @@ export class GmailImapProvider implements EmailProvider {
   }
   async scan(secret: MailSecret): Promise<ScanResult> {
     const client = new ImapFlow({
-      host: "imap.gmail.com",
-      port: 993,
+      host: secret.host || "imap.gmail.com",
+      port: secret.port || 993,
       secure: true,
       auth: { user: secret.email, pass: secret.appPassword },
       logger: false,
@@ -165,7 +165,7 @@ export class GmailImapProvider implements EmailProvider {
     const deadline = setTimeout(() => client.close(), 120000);
     try {
       await client.connect();
-      const lock = await client.getMailboxLock("INBOX", { readOnly: true });
+      const lock = await client.getMailboxLock(secret.folder || "INBOX", { readOnly: true });
       try {
         const since = new Date();
         since.setDate(since.getDate() - 30);
