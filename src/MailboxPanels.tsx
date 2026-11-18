@@ -1,3 +1,4 @@
+import { listenForDataChanges } from "./data-changes";
 import { operationError } from "./operation-error";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -45,10 +46,12 @@ function useMailboxes() {
       }
     };
     void load();
+    const unsubscribeChanges = listenForDataChanges(() => void load());
     const timer = setInterval(() => void load(), 3000);
     return () => {
       alive = false;
       clearInterval(timer);
+      unsubscribeChanges();
     };
   }, []);
   async function action(fn: () => Promise<MailboxResult>, message: string) {

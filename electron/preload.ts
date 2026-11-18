@@ -2,6 +2,13 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "toolbox",
   Object.freeze({
+    onDataChanged: (callback: () => void) => {
+      if (typeof callback !== "function")
+        throw new TypeError("Callback required");
+      const listener = () => callback();
+      ipcRenderer.on("toolbox:data-changed", listener);
+      return () => ipcRenderer.removeListener("toolbox:data-changed", listener);
+    },
     updateOrder: (input: unknown) =>
       ipcRenderer.invoke("toolbox:update-order", input),
     companionStatus: () => ipcRenderer.invoke("toolbox:companion-status"),

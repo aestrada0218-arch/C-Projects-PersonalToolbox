@@ -1,3 +1,4 @@
+import { listenForDataChanges } from "./data-changes";
 import { operationError } from "./operation-error";
 import { OutstandingOrders } from "./MailboxPanels";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -120,10 +121,12 @@ export default function CollectionPanel({
         });
     };
     load();
+    const unsubscribeChanges = listenForDataChanges(() => void load());
     const timer = setInterval(load, 3000);
     return () => {
       alive = false;
       clearInterval(timer);
+      unsubscribeChanges();
     };
   }, []);
   useEffect(() => {

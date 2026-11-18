@@ -1,3 +1,4 @@
+import { listenForDataChanges } from "./data-changes";
 import { localToday } from "./expense-types";
 import { MobileWorkspaceSettings } from "./MobileWorkspaceSettings";
 import CompanionSettings from "./CompanionSettings";
@@ -122,6 +123,28 @@ export default function App() {
       .finally(() => setLoading(false));
   };
   useEffect(reload, []);
+  useEffect(() => {
+    let alive = true,
+      revision = 0;
+    const unsubscribe = listenForDataChanges(() => {
+      const current = ++revision;
+      void window.toolbox
+        ?.snapshot()
+        .then((value) => {
+          if (alive && current === revision) setData(value);
+        })
+        .catch(() => {
+          if (alive)
+            setError(
+              "Could not refresh saved changes. Switch back to Personal Toolbox to retry.",
+            );
+        });
+    });
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, []);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -260,7 +283,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.10.1</span>
+            <span>v0.10.2</span>
           </div>
         </div>
       </aside>
@@ -775,7 +798,7 @@ export default function App() {
                   : "Local database connected"
                 : "Desktop connection required"}
             </span>
-            <span>v0.10.1 · Sample data included.</span>
+            <span>v0.10.2 · Sample data included.</span>
           </footer>
         </main>
       </div>

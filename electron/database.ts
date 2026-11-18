@@ -44,6 +44,22 @@ export const orderSchema = z
   })
   .strict();
 export class Store {
+  private changeListeners = new Set<() => void>();
+  onChange(listener: () => void) {
+    this.changeListeners.add(listener);
+    return () => {
+      this.changeListeners.delete(listener);
+    };
+  }
+  private changed() {
+    for (const listener of [...this.changeListeners]) {
+      try {
+        listener();
+      } catch {
+        /* A view notification must never undo a saved transaction. */
+      }
+    }
+  }
   readonly mail = new MailRepository(
     () => this.db,
     (fn) => this.mutate(fn),
@@ -301,9 +317,7 @@ export class Store {
   }
   addOrder(input: NewOrder) {
     const o = orderSchema.parse(input);
-    const before = this.db.export();
-    this.db.run("BEGIN");
-    try {
+    this.mutate(() => {
       this.db.run("INSERT INTO orders VALUES(?,?,?,?,?,?,?)", [
         randomUUID(),
         o.name,
@@ -313,14 +327,7 @@ export class Store {
         o.status,
         o.date,
       ]);
-      this.db.run("COMMIT");
-      this.persist();
-    } catch (e) {
-      this.db.close();
-      this.db = this.restore(before);
-      this.db.run("PRAGMA foreign_keys=ON");
-      throw e;
-    }
+    });
     return this.snapshot();
   }
   updateOrder(input: unknown) {
@@ -362,6 +369,7 @@ export class Store {
       const result = fn();
       this.db.run("COMMIT");
       this.persist();
+      this.changed();
       return result;
     } catch (error) {
       this.db.close();
@@ -518,6 +526,7 @@ export class Store {
     renameSync(this.path + ".tmp", this.path);
   }
   close() {
+    this.changeListeners.clear();
     this.db.close();
   }
 }

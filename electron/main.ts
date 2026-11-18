@@ -30,6 +30,8 @@ let inbox: InboxService;
 let mailboxes: MailboxService;
 let store: Store;
 let companion: CompanionServer;
+let unsubscribeDataChanges: (() => void) | undefined;
+let dataChangeTimer: ReturnType<typeof setTimeout> | undefined;
 const desktopActions = new Map<string, DesktopAction>();
 let window: BrowserWindow;
 const dev = process.argv.includes("--dev") && !app.isPackaged;
@@ -88,6 +90,17 @@ else {
       store = await Store.open(
         join(app.getPath("userData"), "personal-toolbox.sqlite"),
       );
+      unsubscribeDataChanges = store.onChange(() => {
+        clearTimeout(dataChangeTimer);
+        dataChangeTimer = setTimeout(() => {
+          if (
+            window &&
+            !window.isDestroyed() &&
+            !window.webContents.isDestroyed()
+          )
+            window.webContents.send("toolbox:data-changed");
+        }, 100);
+      });
       const workspace = new WorkspaceGateway(store, desktopActions);
       companion = new CompanionServer(
         store,
@@ -302,6 +315,8 @@ else {
     if (process.platform !== "darwin") app.quit();
   });
   app.on("before-quit", () => {
+    unsubscribeDataChanges?.();
+    clearTimeout(dataChangeTimer);
     companion?.shutdown();
     selling?.stop();
     collectionService?.stop();

@@ -1,3 +1,4 @@
+import { listenForDataChanges } from "./data-changes";
 import { MailboxManager } from "./MailboxPanels";
 import { useEffect, useState } from "react";
 import {
@@ -54,10 +55,12 @@ export default function InboxPanel({
           }
         });
     void load();
+    const unsubscribeChanges = listenForDataChanges(() => void load());
     const timer = setInterval(() => void load(), 5000);
     return () => {
       active = false;
       clearInterval(timer);
+      unsubscribeChanges();
     };
   }, []);
   async function action(fn: () => Promise<InboxResult>, success: string) {

@@ -62,6 +62,10 @@ it("restores memory and disk when persistence fails", async () => {
   const dir = mkdtempSync(join(tmpdir(), "toolbox-failure-"));
   const path = join(dir, "test.sqlite");
   const db = await Store.open(path);
+  let notifications = 0;
+  db.onChange(() => {
+    notifications++;
+  });
   try {
     mkdirSync(path + ".tmp");
     expect(() =>
@@ -75,11 +79,61 @@ it("restores memory and disk when persistence fails", async () => {
       }),
     ).toThrow();
     expect(db.snapshot().orders).toHaveLength(36);
+    expect(notifications).toBe(0);
     const reopened = await Store.open(path);
     expect(reopened.snapshot().orders).toHaveLength(36);
     reopened.close();
   } finally {
     db.close();
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+it("notifies only committed changes across repositories, isolates view errors and unsubscribes", async () => {
+  const db = await Store.open();
+  let notifications = 0;
+  const unsubscribe = db.onChange(() => {
+    notifications++;
+  });
+  db.onChange(() => {
+    throw Error("VIEW_FAILURE");
+  });
+  try {
+    db.addOrder({
+      name: "Live",
+      store: "Shop",
+      category: "Other",
+      total: 1,
+      status: "Processing",
+      date: "2026-11-18",
+    });
+    expect(notifications).toBe(1);
+    const row = db.snapshot().orders.find((o) => o.name === "Live")!;
+    expect(row).toBeDefined();
+    const { id, ...item } = row;
+    db.updateOrder({ id, item: { ...item, total: 2 } });
+    expect(notifications).toBe(2);
+    db.expenses.create(
+      {
+        description: "Live charge",
+        provider: "",
+        retailer: "",
+        category: "Other Expenses",
+        amountCents: 100,
+        date: "2026-11-18",
+        intervalMonths: 0,
+      },
+      "2026-11-18",
+    );
+    expect(notifications).toBe(3);
+    expect(() =>
+      db.updateOrder({ id, item: { ...item, total: -1 } }),
+    ).toThrow();
+    expect(notifications).toBe(3);
+    unsubscribe();
+    db.deleteOrder(id);
+    expect(notifications).toBe(3);
+  } finally {
+    db.close();
   }
 });

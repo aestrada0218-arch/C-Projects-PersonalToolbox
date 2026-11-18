@@ -1,4 +1,4 @@
-# Personal Toolbox · v0.10.1
+# Personal Toolbox · v0.10.2
 
 A Windows desktop app built with Electron, React, TypeScript, Vite, Tailwind CSS, SQLite (sql.js), Recharts, and Playwright. Original dark-and-gold interface. Version 0.6 adds direct eBay fixed-price selling, shared drafts, exact Mercari listing links, and persistent cross-listing follow-ups. Version 0.5 added eBay-email shipping tasks with ship-by dates and scheduled Gmail checks. Version 0.4.1 added illustrated card search and full-title matching. Version 0.4 added a multi-section collection, JustTCG catalog/pricing, saved quote history, and an isolated interactive TCGplayer catalog browser. The categorized expense ledger and recurring bookkeeping remain available.
 
@@ -339,3 +339,9 @@ Windows saves the last valid Tailscale HTTPS address and automatically starts th
 `companion-settings.json` in Electron's user-data folder stores validated preferences and hashes of high-entropy device tokens, never bearer tokens, CSRF secrets, pairing codes or account credentials. Atomic replacement preserves a complete previous/new version; corrupt settings fail closed and report a recoverable Settings error. Pair/revoke/logout acknowledge success only after settings are saved. CSRF secrets rotate on each PC process restart, and interrupted write IDs from a previous process are rejected before execution. Pair once after upgrading from a version that only kept sessions in memory. No SQLite migration is needed.
 
 Tests cover real-file restore, auto-enable, retained URL/phones after pause, persistent revoke/logout/unpair-all, origin changes, expiration, corruption/storage failures and rejection of old-process writes. The Electron Settings flow verifies remembered URLs and automatic companion startup across actual process restarts.
+
+## v0.10.2 — live desktop refresh after phone saves
+
+A committed database write now sends a fixed, data-free notification to the trusted desktop renderer. The dashboard/Orders and each open data panel reload their local state promptly instead of retaining a startup snapshot or waiting for a polling interval. Database writes from the companion and background services use the same mechanism. Notifications are coalesced during bursts, sent only after a successful save and cleaned up on shutdown. Focus/visibility refresh also catches up a restored desktop window. Existing service status polling remains available.
+
+Refresh updates view data without remounting panels, resetting searches or replacing an unfinished form. A failed database write emits no change notification; a failed view listener cannot undo a committed save. Tests cover notification ordering, rollback, unsubscribe and an actual paired phone editing/adding/deleting while the Electron desktop remains open, including a desktop expense draft that stays intact. No database migration or pairing reset is needed.

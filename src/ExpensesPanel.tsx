@@ -1,3 +1,4 @@
+import { listenForDataChanges } from "./data-changes";
 import { operationError } from "./operation-error";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -89,10 +90,12 @@ export default function ExpensesPanel() {
         });
     };
     load();
+    const unsubscribeChanges = listenForDataChanges(() => void load());
     const timer = setInterval(load, 60000);
     return () => {
       alive = false;
       clearInterval(timer);
+      unsubscribeChanges();
     };
   }, []);
   async function action(fn: () => Promise<ExpenseResult>, message: string) {

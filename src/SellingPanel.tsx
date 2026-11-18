@@ -1,3 +1,4 @@
+import { listenForDataChanges } from "./data-changes";
 import { operationError } from "./operation-error";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -115,10 +116,12 @@ export default function SellingPanel({
       }
     };
     void load();
+    const unsubscribeChanges = listenForDataChanges(() => void load());
     const timer = setInterval(() => void load(), 5000);
     return () => {
       alive = false;
       clearInterval(timer);
+      unsubscribeChanges();
     };
   }, []);
   useEffect(() => {

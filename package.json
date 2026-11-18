@@ -1,6 +1,6 @@
 {
   "name": "personal-toolbox",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "private": true,
   "main": "dist-electron/electron/main.js",
   "scripts": {
