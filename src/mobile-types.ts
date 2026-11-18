@@ -1,5 +1,6 @@
 export type CompanionStatus = {
   running: boolean;
+  error?: string;
   url: string | null;
   pairCode: string | null;
   pairExpiresAt: string | null;

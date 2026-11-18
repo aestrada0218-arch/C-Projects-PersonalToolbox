@@ -68,6 +68,7 @@ export interface ToolboxAPI {
   companionStatus(): Promise<CompanionStatus>;
   startCompanion(input: { url: string }): Promise<CompanionResult>;
   stopCompanion(): Promise<CompanionResult>;
+  pauseCompanion(): Promise<CompanionResult>;
   rotateCompanionCode(): Promise<CompanionResult>;
   revokeCompanionDevice(id: string): Promise<CompanionResult>;
   mailboxState(): Promise<MailboxState>;

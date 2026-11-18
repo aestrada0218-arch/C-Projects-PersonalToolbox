@@ -1,6 +1,6 @@
 # Add Personal Toolbox to your iPhone
 
-This is a private mobile web companion. No App Store account or Mac is needed. Your existing Windows app remains the source of truth and must stay open on an awake PC. Version 0.10 opens the **full toolbox** by default after pairing, using the same editors and validation as Windows:
+This is a private mobile web companion. No App Store account or Mac is needed. Your existing Windows app remains the source of truth and must stay open on an awake PC. Version 0.10.1 opens the **full toolbox** by default after pairing, using the same editors and validation as Windows:
 
 - Orders: add, edit, search, delete and export CSV.
 - Collection: search cards, add items, edit quantities/prices/sections, attach photos, delete items and refresh values.
@@ -22,7 +22,7 @@ npm install
 npm run dev
 ```
 
-Development startup now builds the companion assets automatically. For a production build use `npm run build` followed by `npm start`. The mobile companion remains disabled until you enable it in Settings. No new database migration is needed when upgrading from v0.9 to v0.10. Your existing Tailscale Serve configuration can stay in place. After updating Windows, refresh/reopen the iPhone app and pair again if prompted.
+Development startup now builds the companion assets automatically. For a production build use `npm run build` followed by `npm start`. The mobile companion remains disabled until you first enable it in Settings. After that it starts automatically with Personal Toolbox; Pause turns automatic startup off. No new database migration is needed when upgrading from v0.9 to v0.10. Your existing Tailscale Serve configuration can stay in place. After updating Windows, refresh/reopen the iPhone app and pair again if prompted.
 
 ## 2. Connect your devices privately
 
@@ -52,7 +52,11 @@ The local app server binds **127.0.0.1:17863 only**. Tailscale Serve provides th
 4. Enter a device name and the **8-digit pairing code** shown on your PC. Codes expire after five minutes and work once; use **New pairing code** if necessary.
 5. In Safari, choose **Share → Add to Home Screen**. Open the saved Toolbox icon. iOS may use separate cookies for the saved app, so generate another code on your PC and pair there if prompted.
 
-Only pair devices you control. Desktop Settings lists paired device names and lets you revoke one immediately. Stopping the companion unpairs every device. Pairing codes and sessions are cleared when the app restarts; enable the companion and pair again afterward. Otherwise device sessions expire after seven days.
+Only pair devices you control. The HTTPS address is remembered on Windows, including after pausing or closing the app. Enabling the companion also enables automatic startup the next time you open Personal Toolbox. A remembered iPhone stays paired for **30 days from pairing**, including across normal PC app restarts, Tailscale disconnections and phone restarts. The app does not start Windows or wake a sleeping PC.
+
+**Pause companion** stops phone access and automatic startup but retains the address and remembered phones. Click **Enable iPhone companion** to resume without pasting the URL or pairing again. **Revoke**, the phone's **Unpair** button, and **Stop companion and unpair all devices** explicitly forget the affected phone(s). The last address remains saved. Changing the configured HTTPS address also forgets devices. Clearing browser data, switching Safari/Home Screen storage, expiration or deleting desktop settings requires pairing again. Pairing codes themselves remain single-use, expire after five minutes and are never saved across app restarts.
+
+Upgrading from v0.10.0 requires entering the address and pairing once more because that version did not save them. Subsequent normal restarts remember both.
 
 ## Using the companion
 
@@ -69,7 +73,7 @@ Companion enabling, pairing-code generation and device revocation remain in **Wi
 ## If it does not connect
 
 - Confirm both devices are signed into and connected to the same Tailscale network.
-- Keep the PC awake and Personal Toolbox open. Reopening the app requires enabling and pairing again.
+- Keep the PC awake and Personal Toolbox open. Reopening the app automatically resumes an enabled companion. If you deliberately paused it, enable it again; pairing is retained.
 - Confirm the exact HTTPS address matches the one entered in Settings and the address printed by `tailscale serve`.
 - Check `tailscale serve status` on Windows and verify it forwards to `http://127.0.0.1:17863`.
 - If enabling fails, run `npm run build` and restart the app. Another program may be using port 17863.
@@ -80,6 +84,6 @@ You can remove the Tailscale Serve forwarding later with `tailscale serve reset`
 
 ## Security and validation
 
-The companion uses a private HTTPS origin, single-use pairing codes, 256-bit session tokens, Secure/HttpOnly/SameSite cookies, server-side revocation, CSRF protection, input validation, origin/host checks and narrow API operations. Authentication exists only in memory on the PC and a secure cookie on the phone; it is not written to the database or logs. The offline service worker caches app files only and bypasses API responses. API responses use `Cache-Control: no-store`.
+The companion uses a private HTTPS origin, single-use pairing codes, 256-bit session tokens, Secure/HttpOnly/SameSite cookies, server-side revocation, CSRF protection, input validation, origin/host checks and narrow API operations. The bearer token lives only in the phone's secure cookie. Windows remembers its SHA-256 hash, device identity/expiry, configured origin and enabled state in an atomically replaced `companion-settings.json` file in the app data folder. Bearer tokens, pairing codes, CSRF secrets and account credentials are never written to that file or logs. CSRF secrets rotate on desktop restart. Interrupted full-workspace writes from an earlier process are rejected so a remembered session cannot replay an uncertain save after restart. The offline service worker caches app files only and bypasses API responses. API responses use `Cache-Control: no-store`.
 
-Automated tests use a real local server/database and a simulated private HTTPS origin in an iPhone-sized Chromium browser. They cover pairing, cookies, data reads, full phone editors, photo selection, CSV download/import, recurring expenses, bulk outstanding edits/deletes, request idempotency, stale edits, revocation, expiry, rate limits, forbidden operations, offline behavior and the desktop enable/stop flow. A physical iPhone, Safari Home Screen installation and a live Tailscale connection must be checked on your devices.
+Automated tests use a real local server/database and a simulated private HTTPS origin in an iPhone-sized Chromium browser. They cover pairing, cookies, data reads, full phone editors, photo selection, CSV download/import, recurring expenses, bulk outstanding edits/deletes, request idempotency, stale edits, revocation, expiry, remembered pairing, automatic restart, pause/resume, durable revocation, corrupt settings, storage failures, rate limits, forbidden operations, offline behavior and the desktop enable/stop flow. A physical iPhone, Safari Home Screen installation and a live Tailscale connection must be checked on your devices.

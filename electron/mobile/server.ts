@@ -1,3 +1,4 @@
+import { companionRequestPrefix } from "../../src/companion-request";
 import { WorkspaceError } from "./workspace";
 import {
   createServer,
@@ -30,26 +31,13 @@ const same = (a: string, b: string) => {
   return aa.length === bb.length && timingSafeEqual(aa, bb);
 };
 const version = (v: unknown) => hash(JSON.stringify(v));
-const ttl = 7 * 86400000;
-export const companionOrigin = z
-  .string()
-  .url()
-  .max(253)
-  .transform((v) => {
-    const u = new URL(v);
-    if (
-      u.protocol !== "https:" ||
-      !u.hostname.endsWith(".ts.net") ||
-      u.port ||
-      u.username ||
-      u.password ||
-      u.pathname !== "/" ||
-      u.search ||
-      u.hash
-    )
-      throw Error("ORIGIN_INVALID");
-    return u.origin;
-  });
+const ttl = 30 * 86400000;
+export { companionOrigin } from "./preferences";
+import {
+  companionOrigin,
+  type CompanionPersistence,
+  type CompanionPreferences,
+} from "./preferences";
 type Device = {
   id: string;
   name: string;
@@ -59,6 +47,8 @@ type Device = {
   csrf: string;
 };
 export class CompanionServer {
+  private autoEnabled = false;
+  private settingsError: string | undefined;
   private server: Server | null = null;
   private origin: string | null = null;
   private code: string | null = null;
@@ -72,11 +62,53 @@ export class CompanionServer {
     private assets: string,
     private port = 17863,
     private workspace?: (deviceId: string, input: unknown) => Promise<unknown>,
-  ) {}
+    private persistence?: CompanionPersistence,
+  ) {
+    try {
+      const saved = persistence?.load();
+      if (saved) {
+        this.origin = companionOrigin.nullable().parse(saved.url);
+        this.autoEnabled = saved.enabled && !!this.origin;
+        for (const d of saved.devices)
+          if (
+            Date.parse(d.expiresAt) > Date.now() &&
+            Date.parse(d.expiresAt) <= Date.now() + ttl
+          )
+            this.devices.set(d.tokenHash, {
+              ...d,
+              csrf: randomBytes(32).toString("hex"),
+            });
+      }
+    } catch {
+      this.origin = null;
+      this.autoEnabled = false;
+      this.devices.clear();
+      this.settingsError =
+        "Saved companion settings could not be read. Enable and pair again to replace them.";
+    }
+  }
+  private persist(changes: Partial<CompanionPreferences> = {}) {
+    this.persistence?.save({
+      version: 1,
+      url: this.origin,
+      enabled: this.autoEnabled,
+      devices: [...this.devices.values()].map(({ csrf: _, ...d }) => d),
+      ...changes,
+    });
+    this.settingsError = undefined;
+  }
+  async restore() {
+    if (this.autoEnabled && this.origin) {
+      const r = await this.start({ url: this.origin });
+      if (!r.ok) this.settingsError = r.error;
+    }
+    return this.status();
+  }
   status(): CompanionStatus {
     this.prune();
     return {
       running: !!this.server?.listening,
+      error: this.settingsError,
       url: this.origin,
       pairCode: this.code && Date.now() < this.codeExpires ? this.code : null,
       pairExpiresAt:
@@ -128,8 +160,26 @@ export class CompanionServer {
           resolve();
         });
       });
+      const sameOrigin = this.origin === url;
+      try {
+        this.persist({
+          url,
+          enabled: true,
+          devices: sameOrigin
+            ? [...this.devices.values()].map(({ csrf: _, ...d }) => d)
+            : [],
+        });
+      } catch {
+        server.close();
+        for (const socket of this.sockets) socket.destroy();
+        throw Error("PREFERENCES_SAVE_FAILED");
+      }
+      if (!sameOrigin) this.devices.clear();
+      this.autoEnabled = true;
       server.on("error", () => {
-        this.stop();
+        this.shutdown();
+        this.settingsError =
+          "The companion stopped unexpectedly. Check the saved address and enable it again.";
       });
       this.server = server;
       this.addressPort = (server.address() as { port: number }).port;
@@ -138,7 +188,7 @@ export class CompanionServer {
       return this.result();
     } catch {
       return this.result(
-        "Could not start the companion. Build the app first, use your private https://PC.TAILNET.ts.net address, and check that port 17863 is free.",
+        "Could not start the companion. Build the app first, use your private https://PC.TAILNET.ts.net address, and check that port 17863 is free and app settings are writable.",
       );
     }
   }
@@ -151,25 +201,55 @@ export class CompanionServer {
   revoke(input: unknown) {
     try {
       const id = z.string().uuid().parse(input);
+      this.persist({
+        devices: [...this.devices.values()]
+          .filter((d) => d.id !== id)
+          .map(({ csrf: _, ...d }) => d),
+      });
       for (const [key, d] of this.devices)
         if (d.id === id) this.devices.delete(key);
       return this.result();
     } catch {
-      return this.result("Choose a connected device.");
+      return this.result(
+        "Could not revoke the device. Check the selection and settings storage permissions.",
+      );
     }
   }
+  pause() {
+    try {
+      this.persist({ enabled: false });
+    } catch {
+      return this.result(
+        "Could not save paused settings. Check storage permissions.",
+      );
+    }
+    this.autoEnabled = false;
+    this.shutdown();
+    return this.result();
+  }
   stop() {
+    try {
+      this.persist({ enabled: false, devices: [] });
+    } catch {
+      return this.result(
+        "Could not unpair devices. Check settings storage permissions and try again.",
+      );
+    }
+    this.autoEnabled = false;
+    this.devices.clear();
+    this.shutdown();
+    return this.result();
+  }
+  // Normal app exit keeps the saved enabled state and remembered device hashes.
+  shutdown() {
     const server = this.server;
     this.server = null;
-    this.origin = null;
     this.code = null;
     this.codeExpires = 0;
-    this.devices.clear();
     this.failures = [];
     server?.close();
     for (const socket of this.sockets) socket.destroy();
     this.sockets.clear();
-    return this.result();
   }
   // Used by local integration tests; the listener always binds loopback.
   localPort() {
@@ -355,6 +435,19 @@ export class CompanionServer {
             tokenHash,
             csrf: randomBytes(32).toString("hex"),
           };
+        try {
+          this.persist({
+            devices: [...this.devices.values(), device].map(
+              ({ csrf: _, ...d }) => d,
+            ),
+          });
+        } catch {
+          this.json(res, 503, {
+            error:
+              "Could not remember this phone. Check settings storage permissions on your PC and try again.",
+          });
+          return;
+        }
         this.devices.set(tokenHash, device);
         this.code = null;
         this.codeExpires = 0;
@@ -399,6 +492,19 @@ export class CompanionServer {
         return;
       }
       if (url.pathname === "/api/logout") {
+        try {
+          this.persist({
+            devices: [...this.devices.values()]
+              .filter((d) => d.tokenHash !== session.tokenHash)
+              .map(({ csrf: _, ...d }) => d),
+          });
+        } catch {
+          this.json(res, 503, {
+            error:
+              "Could not unpair this phone. Revoke it in Windows Settings and check storage permissions.",
+          });
+          return;
+        }
         this.devices.delete(session.tokenHash);
         res.setHeader(
           "Set-Cookie",
@@ -423,6 +529,18 @@ export class CompanionServer {
             this.json(res, 404, {
               error:
                 "Update your desktop app to enable the full mobile workspace.",
+            });
+            return;
+          }
+          if (
+            typeof (input as any)?.requestId !== "string" ||
+            !(input as any).requestId.startsWith(
+              companionRequestPrefix(hash(session.csrf)),
+            )
+          ) {
+            this.json(res, 409, {
+              error:
+                "The desktop restarted since this save was started. Check the latest data before starting a new action; this interrupted request was not repeated.",
             });
             return;
           }

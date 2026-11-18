@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld(
     companionStatus: () => ipcRenderer.invoke("toolbox:companion-status"),
     startCompanion: (input: unknown) =>
       ipcRenderer.invoke("toolbox:companion-start", input),
+    pauseCompanion: () => ipcRenderer.invoke("toolbox:companion-pause"),
     stopCompanion: () => ipcRenderer.invoke("toolbox:companion-stop"),
     rotateCompanionCode: () => ipcRenderer.invoke("toolbox:companion-pair"),
     revokeCompanionDevice: (id: unknown) =>

@@ -163,9 +163,9 @@ test("iPhone-sized companion pairs securely and updates the same desktop databas
     db.close();
   }
 });
-test("desktop settings enable and stop the private companion through secure IPC", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "companion-settings-")),
-    app = await electron.launch({ args: [".", `--user-data-dir=${dir}`] });
+test("desktop settings remember the address after pause and automatically resume after app restart", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "companion-settings-"));
+  let app = await electron.launch({ args: [".", `--user-data-dir=${dir}`] });
   try {
     const page = await app.firstWindow();
     await page.getByRole("button", { name: "Settings", exact: true }).click();
@@ -181,11 +181,44 @@ test("desktop settings enable and stop the private companion through secure IPC"
     await page.getByRole("button", { name: "New pairing code" }).click();
     await expect(page.getByLabel("Current pairing code")).toHaveText(/^\d{8}$/);
     await page
-      .getByRole("button", { name: "Stop companion and unpair all devices" })
+      .getByRole("button", { name: "Pause companion", exact: true })
       .click();
     await expect(
       page.getByRole("button", { name: "Enable iPhone companion" }),
     ).toBeVisible();
+    await app.close();
+    app = await electron.launch({ args: [".", `--user-data-dir=${dir}`] });
+    let restarted = await app.firstWindow();
+    await restarted
+      .getByRole("button", { name: "Settings", exact: true })
+      .click();
+    await expect(
+      restarted.getByLabel("Private Tailscale HTTPS address"),
+    ).toHaveValue(origin);
+    await expect(
+      restarted.getByRole("button", { name: "Enable iPhone companion" }),
+    ).toBeVisible();
+    await restarted
+      .getByRole("button", { name: "Enable iPhone companion" })
+      .click();
+    await expect(restarted.getByLabel("Current pairing code")).toHaveText(
+      /^\d{8}$/,
+    );
+    await app.close();
+    app = await electron.launch({ args: [".", `--user-data-dir=${dir}`] });
+    restarted = await app.firstWindow();
+    await restarted
+      .getByRole("button", { name: "Settings", exact: true })
+      .click();
+    await expect(restarted.getByLabel("Current pairing code")).toHaveText(
+      /^\d{8}$/,
+    );
+    await expect(
+      restarted.getByLabel("Private Tailscale HTTPS address"),
+    ).toHaveValue(origin);
+    await restarted
+      .getByRole("button", { name: "Pause companion", exact: true })
+      .click();
   } finally {
     await app.close();
     rmSync(dir, { recursive: true, force: true });

@@ -258,7 +258,7 @@ it("revokes devices immediately and clears pairing and sessions on stop", async 
 import { vi } from "vitest";
 import { runInNewContext } from "node:vm";
 import { readFileSync } from "node:fs";
-it("expires unused pairing codes and device sessions without persisting authentication", async () => {
+it("expires unused pairing codes and remembered device sessions", async () => {
   const f = await setup(),
     base = Date.now();
   const clock = vi.spyOn(Date, "now").mockReturnValue(base + 6 * 60000);
@@ -269,7 +269,7 @@ it("expires unused pairing codes and device sessions without persisting authenti
     expect(f.server.status().pairCode).toBeNull();
     f.server.rotatePairCode();
     const { cookie } = await f.pair();
-    clock.mockReturnValue(base + 8 * 86400000);
+    clock.mockReturnValue(base + 31 * 86400000);
     expect((await f.call("/api/session", undefined, cookie)).status).toBe(401);
     expect(f.server.status().devices).toHaveLength(0);
   } finally {

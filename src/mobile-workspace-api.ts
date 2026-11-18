@@ -1,3 +1,4 @@
+import { companionRequestPrefix } from "./companion-request";
 import { workspaceGuards } from "./workspace-guards";
 import type { ToolboxAPI } from "./types";
 export class WorkspaceApiError extends Error {
@@ -148,7 +149,18 @@ export function createMobileWorkspaceApi(
         "This interrupted request is older than 10 minutes. Refresh and check the saved data before starting a new action.",
         409,
       );
-    const requestId = pending.get(fingerprint) || crypto.randomUUID();
+    const sessionDigest = Array.from(
+      new Uint8Array(
+        await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(getCsrf()),
+        ),
+      ),
+      (b) => b.toString(16).padStart(2, "0"),
+    ).join("");
+    const requestId =
+      pending.get(fingerprint) ||
+      companionRequestPrefix(sessionDigest) + crypto.randomUUID().slice(24);
     pending.set(fingerprint, requestId);
     if (
       !reads.has(method) &&
@@ -460,6 +472,7 @@ export function createMobileWorkspaceApi(
   api.companionStatus = async () => (await disabled()).state;
   api.startCompanion = disabled;
   api.stopCompanion = disabled;
+  api.pauseCompanion = disabled;
   api.rotateCompanionCode = disabled;
   api.revokeCompanionDevice = disabled;
   return api as unknown as ToolboxAPI;

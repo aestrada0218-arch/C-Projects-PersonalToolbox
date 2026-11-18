@@ -1,4 +1,4 @@
-# Personal Toolbox · v0.10.0
+# Personal Toolbox · v0.10.1
 
 A Windows desktop app built with Electron, React, TypeScript, Vite, Tailwind CSS, SQLite (sql.js), Recharts, and Playwright. Original dark-and-gold interface. Version 0.6 adds direct eBay fixed-price selling, shared drafts, exact Mercari listing links, and persistent cross-listing follow-ups. Version 0.5 added eBay-email shipping tasks with ship-by dates and scheduled Gmail checks. Version 0.4.1 added illustrated card search and full-title matching. Version 0.4 added a multi-section collection, JustTCG catalog/pricing, saved quote history, and an isolated interactive TCGplayer catalog browser. The categorized expense ledger and recurring bookkeeping remain available.
 
@@ -331,3 +331,11 @@ Gmail/IMAP checks, provider lookups and marketplace operations requested on the 
 The server retains loopback-only binding, private HTTPS origin/host checks, Secure/HttpOnly/SameSite cookies, expiring single-use pairing codes, CSRF protection, session revocation and API no-store headers. It exposes no arbitrary IPC channel, native file path or shell interface. Phone editors freeze record versions and reject conflicting edits from Windows. Per-device request IDs deduplicate interrupted writes for ten minutes; no raw credential input is cached for retries. The service worker caches static app files only and bypasses API requests.
 
 `npm run dev` builds mobile assets before starting Electron. `npm run build` emits desktop/mobile HTML, icons, a manifest and the static service worker; `npm start` opens that production build. Tests use real local stores/server and an iPhone-sized Chromium browser for full editing, photos, CSVs, recurring expenses, outstanding bulk actions and stale-record rejection, alongside existing desktop/API tests. Physical iPhone Safari/Home Screen and live Tailscale/provider behavior require checks on your devices.
+
+## v0.10.1 — remembered iPhone connection
+
+Windows saves the last valid Tailscale HTTPS address and automatically starts the companion on subsequent app launches after it has been enabled. Remembered phone sessions last 30 days from pairing and survive normal app/network restarts. **Pause companion** retains the address and paired devices, while turning automatic startup off. Enable resumes the saved connection. Revoke, phone Unpair and the explicit unpair-all control durably forget devices. Changing the HTTPS origin invalidates existing pairing. The Windows app and Tailscale must still be running on an awake PC.
+
+`companion-settings.json` in Electron's user-data folder stores validated preferences and hashes of high-entropy device tokens, never bearer tokens, CSRF secrets, pairing codes or account credentials. Atomic replacement preserves a complete previous/new version; corrupt settings fail closed and report a recoverable Settings error. Pair/revoke/logout acknowledge success only after settings are saved. CSRF secrets rotate on each PC process restart, and interrupted write IDs from a previous process are rejected before execution. Pair once after upgrading from a version that only kept sessions in memory. No SQLite migration is needed.
+
+Tests cover real-file restore, auto-enable, retained URL/phones after pause, persistent revoke/logout/unpair-all, origin changes, expiration, corruption/storage failures and rejection of old-process writes. The Electron Settings flow verifies remembered URLs and automatic companion startup across actual process restarts.

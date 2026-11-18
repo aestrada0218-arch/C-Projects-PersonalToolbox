@@ -1,3 +1,4 @@
+import { FileCompanionPreferences } from "./mobile/preferences";
 import { WorkspaceGateway, type DesktopAction } from "./mobile/workspace";
 import { nativeImage } from "electron";
 import { z } from "zod";
@@ -93,10 +94,14 @@ else {
         join(__dirname, "../../dist"),
         17863,
         (device, input) => workspace.execute(device, input),
+        new FileCompanionPreferences(
+          join(app.getPath("userData"), "companion-settings.json"),
+        ),
       );
       handle("toolbox:companion-status", () => companion.status());
       handle("toolbox:companion-start", (input) => companion.start(input));
       handle("toolbox:companion-stop", () => companion.stop());
+      handle("toolbox:companion-pause", () => companion.pause());
       handle("toolbox:companion-pair", () => companion.rotatePairCode());
       handle("toolbox:companion-revoke", (id) => companion.revoke(id));
       selling = new SellingService(
@@ -280,6 +285,7 @@ else {
         handle,
       );
 
+      await companion.restore();
       createWindow();
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -296,7 +302,7 @@ else {
     if (process.platform !== "darwin") app.quit();
   });
   app.on("before-quit", () => {
-    companion?.stop();
+    companion?.shutdown();
     selling?.stop();
     collectionService?.stop();
     tcgBrowser?.close();

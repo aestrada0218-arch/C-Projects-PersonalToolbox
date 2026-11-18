@@ -20,7 +20,8 @@ export default function CompanionSettings() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const acting = useRef(false),
-    revision = useRef(0);
+    revision = useRef(0),
+    urlEdited = useRef(false);
   useEffect(() => {
     let alive = true;
     const load = async () => {
@@ -28,7 +29,10 @@ export default function CompanionSettings() {
       const rev = revision.current;
       try {
         const s = await window.toolbox!.companionStatus();
-        if (alive && rev === revision.current) setState(s);
+        if (alive && rev === revision.current) {
+          setState(s);
+          if (!urlEdited.current) setUrl(s.url || "");
+        }
       } catch {
         if (alive) setError("Could not load companion settings.");
       }
@@ -49,6 +53,10 @@ export default function CompanionSettings() {
     try {
       const r = await fn();
       setState(r.state);
+      if (r.ok) {
+        urlEdited.current = false;
+        setUrl(r.state.url || "");
+      }
       if (!r.ok) setError(r.error || "Could not update the companion.");
     } catch {
       setError("Could not reach the desktop companion service.");
@@ -81,14 +89,12 @@ export default function CompanionSettings() {
           </div>
           <span className="local-pill">
             <ShieldCheck size={14} />
-            {state.running
-              ? "Enabled · private HTTPS required"
-              : "Off by default"}
+            {state.running ? "Enabled · private HTTPS required" : "Not running"}
           </span>
         </div>
-        {error && (
+        {(error || state.error) && (
           <div className="alert" role="alert">
-            {error}
+            {error || state.error}
           </div>
         )}
         <div className="companion-content">
@@ -131,7 +137,10 @@ export default function CompanionSettings() {
                 required
                 value={state.running ? state.url || "" : url}
                 disabled={state.running || busy}
-                onChange={(e) => setUrl(e.target.value)}
+                onChange={(e) => {
+                  urlEdited.current = true;
+                  setUrl(e.target.value);
+                }}
               />
             </label>
             <div className="actions">
@@ -144,11 +153,27 @@ export default function CompanionSettings() {
                   type="button"
                   disabled={busy}
                   onClick={() =>
-                    void act(() => window.toolbox!.stopCompanion())
+                    void act(() => window.toolbox!.pauseCompanion())
                   }
                 >
                   <Power size={15} />
-                  Stop companion and unpair all devices
+                  Pause companion
+                </button>
+              )}
+              {state.devices.length > 0 && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Stop the companion and forget all paired devices? Each phone will need a new pairing code.",
+                      )
+                    )
+                      void act(() => window.toolbox!.stopCompanion());
+                  }}
+                >
+                  <Trash2 size={15} /> Stop companion and unpair all devices
                 </button>
               )}
             </div>
@@ -183,9 +208,13 @@ export default function CompanionSettings() {
             is created. Saved passwords, API keys and full emails stay on the
             desktop. New credentials entered on a phone are sent over private
             HTTPS and stored in Windows Credential Manager. Phone edits save
-            directly to this database. Pairing and device sessions are cleared
-            when the companion stops or the app restarts; sessions otherwise
-            expire after 7 days.
+            directly to this database. The address is remembered. Once enabled,
+            the companion starts automatically when you open Personal Toolbox.
+            Your iPhone stays paired for 30 days across app restarts and network
+            disconnects. Pause keeps pairing and turns automatic startup off;
+            enable it again to resume. Revoke, Unpair, or “unpair all devices”
+            forgets a phone. Clearing Safari data or using a different browser
+            may require pairing again.
           </p>
         </div>
       </section>
