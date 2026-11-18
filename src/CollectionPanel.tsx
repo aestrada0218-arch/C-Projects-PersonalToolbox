@@ -1,3 +1,4 @@
+import { operationError } from "./operation-error";
 import { OutstandingOrders } from "./MailboxPanels";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -178,9 +179,12 @@ export default function CollectionPanel({
       setModal(null);
       onChanged();
       return true;
-    } catch {
+    } catch (error) {
       setError(
-        "The collection service could not complete the request. Please retry.",
+        operationError(
+          error,
+          "The collection service could not complete the request. Please retry.",
+        ),
       );
       return false;
     } finally {
@@ -229,6 +233,7 @@ export default function CollectionPanel({
     }
   }
   const open = (value: Modal) => {
+    window.toolbox?.captureEdit?.(value);
     setError("");
     setModal(value);
   };

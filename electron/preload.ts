@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "toolbox",
   Object.freeze({
+    updateOrder: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:update-order", input),
     companionStatus: () => ipcRenderer.invoke("toolbox:companion-status"),
     startCompanion: (input: unknown) =>
       ipcRenderer.invoke("toolbox:companion-start", input),

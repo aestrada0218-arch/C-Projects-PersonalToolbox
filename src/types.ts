@@ -62,6 +62,9 @@ export type Snapshot = {
 };
 export type NewOrder = Omit<Order, "id">;
 export interface ToolboxAPI {
+  readonly mobileMode?: boolean;
+  captureEdit?(value: unknown): void;
+  updateOrder(input: { id: string; item: NewOrder }): Promise<Snapshot>;
   companionStatus(): Promise<CompanionStatus>;
   startCompanion(input: { url: string }): Promise<CompanionResult>;
   stopCompanion(): Promise<CompanionResult>;

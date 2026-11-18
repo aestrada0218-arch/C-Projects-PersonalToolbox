@@ -74,7 +74,10 @@ export default function CompanionSettings() {
             <h2>
               <Smartphone size={18} /> iPhone companion
             </h2>
-            <p>Collection, outstanding orders, expenses and shipment tasks.</p>
+            <p>
+              Edit orders, collection, outstanding items, expenses, tasks,
+              inboxes and selling drafts.
+            </p>
           </div>
           <span className="local-pill">
             <ShieldCheck size={14} />
@@ -177,10 +180,12 @@ export default function CompanionSettings() {
           )}
           <p className="companion-note">
             Keep this PC awake and Personal Toolbox running. No cloud database
-            is created. Gmail passwords, API keys and full emails stay on the
-            desktop. Phone edits save directly to this database. Pairing and
-            device sessions are cleared when the companion stops or the app
-            restarts; sessions otherwise expire after 7 days.
+            is created. Saved passwords, API keys and full emails stay on the
+            desktop. New credentials entered on a phone are sent over private
+            HTTPS and stored in Windows Credential Manager. Phone edits save
+            directly to this database. Pairing and device sessions are cleared
+            when the companion stops or the app restarts; sessions otherwise
+            expire after 7 days.
           </p>
         </div>
       </section>
@@ -192,8 +197,9 @@ export default function CompanionSettings() {
               <span className="count">{state.devices.length}</span>
             </h2>
             <p>
-              Only pair devices you control. Revoking a device blocks its next
-              request.
+              Paired phones can edit and delete data and use your connected
+              accounts. Only pair devices you control. Revoking a device blocks
+              its next request.
             </p>
           </div>
         </div>

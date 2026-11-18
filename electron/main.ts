@@ -1,3 +1,7 @@
+import { WorkspaceGateway, type DesktopAction } from "./mobile/workspace";
+import { nativeImage } from "electron";
+import { z } from "zod";
+import { safePhotoSize } from "./collection/photo";
 import { CompanionServer } from "./mobile/server";
 import { MailboxService } from "./mailboxes/service";
 import { net } from "electron";
@@ -25,6 +29,7 @@ let inbox: InboxService;
 let mailboxes: MailboxService;
 let store: Store;
 let companion: CompanionServer;
+const desktopActions = new Map<string, DesktopAction>();
 let window: BrowserWindow;
 const dev = process.argv.includes("--dev") && !app.isPackaged;
 function createWindow() {
@@ -62,6 +67,7 @@ function authorized(event: Electron.IpcMainInvokeEvent) {
     throw new Error("Unauthorized request");
 }
 function handle(channel: string, fn: (...args: any[]) => unknown) {
+  desktopActions.set(channel, fn);
   ipcMain.handle(channel, async (event, ...args) => {
     authorized(event);
     try {
@@ -81,7 +87,13 @@ else {
       store = await Store.open(
         join(app.getPath("userData"), "personal-toolbox.sqlite"),
       );
-      companion = new CompanionServer(store, join(__dirname, "../../dist"));
+      const workspace = new WorkspaceGateway(store, desktopActions);
+      companion = new CompanionServer(
+        store,
+        join(__dirname, "../../dist"),
+        17863,
+        (device, input) => workspace.execute(device, input),
+      );
       handle("toolbox:companion-status", () => companion.status());
       handle("toolbox:companion-start", (input) => companion.start(input));
       handle("toolbox:companion-stop", () => companion.stop());
@@ -207,6 +219,30 @@ else {
       );
       handle("toolbox:snapshot", () => store.snapshot());
       handle("toolbox:delete-order", (id) => store.deleteOrder(id));
+      handle("toolbox:update-order", (input) => store.updateOrder(input));
+      handle("toolbox:mobile-selling-photo", async (input) => {
+        const { id, data } = z
+          .object({
+            id: z.string().uuid(),
+            data: z
+              .string()
+              .max(4 * 1024 * 1024)
+              .regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/),
+          })
+          .strict()
+          .parse(input);
+        const bytes = Buffer.from(data.split(",")[1], "base64"),
+          size = safePhotoSize(bytes);
+        if (
+          !size ||
+          Math.max(size.width, size.height) < 500 ||
+          Math.max(size.width, size.height) > 1600
+        )
+          throw Error("PHOTO_INVALID");
+        const image = nativeImage.createFromBuffer(bytes);
+        if (image.isEmpty()) throw Error("PHOTO_INVALID");
+        return selling.upload(id, image.toJPEG(90));
+      });
       handle("toolbox:add-order", (input) => store.addOrder(input));
       handle("toolbox:export-orders", async () => {
         const result = await dialog.showSaveDialog(window, {

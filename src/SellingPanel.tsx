@@ -1,3 +1,4 @@
+import { operationError } from "./operation-error";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUpRight,
@@ -156,9 +157,12 @@ export default function SellingPanel({
       setModal(review ? { kind: "review", review } : null);
       onChanged();
       return true;
-    } catch {
+    } catch (error) {
       setError(
-        "Could not complete the selling request. Check the app connection and retry.",
+        operationError(
+          error,
+          "Could not complete the selling request. Check the app connection and retry.",
+        ),
       );
       return false;
     } finally {
@@ -167,8 +171,13 @@ export default function SellingPanel({
     }
   }
   const open = (value: Modal) => {
+    window.toolbox?.captureEdit?.(value);
     setError("");
     setModal(value);
+  };
+  const uploadPhoto = (unit: SellingUnit) => {
+    window.toolbox?.captureEdit?.(unit);
+    return window.toolbox!.uploadSellingPhoto(unit.id);
   };
   const external = (item: SellingUnit, platform: "ebay" | "mercari") =>
     void window
@@ -767,8 +776,7 @@ export default function SellingPanel({
                             }
                             onClick={() =>
                               void action(
-                                () =>
-                                  window.toolbox!.uploadSellingPhoto(unit.id),
+                                () => uploadPhoto(unit),
                                 "Your photo was uploaded to eBay and added to this draft.",
                               )
                             }

@@ -1,3 +1,4 @@
+import MobileWorkspace from "./MobileWorkspace";
 import { useEffect, useRef, useState } from "react";
 import {
   BriefcaseBusiness,
@@ -27,6 +28,8 @@ type Edit =
 export default function MobileApp() {
   const [name, setName] = useState(""),
     [csrf, setCsrf] = useState(""),
+    [workspace, setWorkspace] = useState(false),
+    [quick, setQuick] = useState(false),
     [data, setData] = useState<MobileSnapshot | null>(null),
     [tab, setTab] = useState("Home"),
     [query, setQuery] = useState(""),
@@ -40,6 +43,9 @@ export default function MobileApp() {
     generation = useRef(0),
     dialog = useRef<HTMLDialogElement>(null);
   const unpair = () => {
+    try {
+      sessionStorage.removeItem("toolbox-pending-workspace-v1");
+    } catch {}
     generation.current++;
     setCsrf("");
     setName("");
@@ -104,6 +110,7 @@ export default function MobileApp() {
         if (alive) {
           setCsrf(v.csrf);
           setName(v.name);
+          setWorkspace(!!v.workspace);
         }
       } catch {
         if (alive) setOffline(true);
@@ -116,7 +123,7 @@ export default function MobileApp() {
     };
   }, []);
   useEffect(() => {
-    if (!csrf) return;
+    if (!csrf || (workspace && !quick)) return;
     void refresh();
     const timer = setInterval(() => {
       if (!document.hidden) void refresh(true);
@@ -129,7 +136,7 @@ export default function MobileApp() {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [csrf]);
+  }, [csrf, workspace, quick]);
   useEffect(() => {
     if (edit) dialog.current?.showModal();
   }, [edit]);
@@ -189,6 +196,10 @@ export default function MobileApp() {
           Open Settings → iPhone companion on your Windows PC and generate a
           pairing code.
         </p>
+        <p>
+          Only pair a device you control. A paired phone can edit and delete app
+          data and manage connected accounts.
+        </p>
         <form
           onSubmit={async (e) => {
             e.preventDefault();
@@ -206,6 +217,7 @@ export default function MobileApp() {
               });
               setCsrf(v.csrf);
               setName(v.name);
+              setWorkspace(!!v.workspace);
               setOffline(false);
             } catch (err) {
               setError(err instanceof Error ? err.message : "Pairing failed.");
@@ -269,6 +281,21 @@ export default function MobileApp() {
         </aside>
       </main>
     );
+  if (workspace && !quick)
+    return (
+      <MobileWorkspace
+        csrf={csrf}
+        onExpired={unpair}
+        onQuick={() => setQuick(true)}
+        onLogout={() => {
+          void api("logout", {})
+            .then(unpair)
+            .catch((e) =>
+              setError(e instanceof Error ? e.message : "Could not unpair."),
+            );
+        }}
+      />
+    );
   return (
     <div className="m-app">
       <header>
@@ -278,6 +305,9 @@ export default function MobileApp() {
             personal toolbox<span className="m-gold">.</span>
           </span>
         </div>
+        {workspace && (
+          <button onClick={() => setQuick(false)}>Full toolbox</button>
+        )}
         <button
           aria-label="Refresh data"
           disabled={busy}

@@ -1,3 +1,4 @@
+import { operationError } from "./operation-error";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Mail,
@@ -66,9 +67,12 @@ function useMailboxes() {
       }
       setNotice(message);
       return true;
-    } catch {
+    } catch (error) {
       setError(
-        "Could not complete the request. Check the desktop connection and retry.",
+        operationError(
+          error,
+          "Could not complete the request. Check the desktop connection and retry.",
+        ),
       );
       return false;
     } finally {
@@ -479,6 +483,7 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
         selectedIds.length > 0 && selectedIds.length < items.length;
   }, [selectedIds.length, items.length]);
   const openDate = (ids: string[]) => {
+    window.toolbox?.captureEdit?.(items.filter((l) => ids.includes(l.id)));
     const values = new Set(
       items.filter((l) => ids.includes(l.id)).map((l) => l.expectedDate || ""),
     );
@@ -576,7 +581,12 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
         <button
           className="danger-button"
           disabled={busy || !selectedIds.length}
-          onClick={() => setEdit({ kind: "delete", ids: selectedIds })}
+          onClick={() => {
+            window.toolbox?.captureEdit?.(
+              items.filter((l) => selectedIds.includes(l.id)),
+            );
+            setEdit({ kind: "delete", ids: selectedIds });
+          }}
         >
           <Trash2 size={14} />
           Delete selected
@@ -708,7 +718,10 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
                         " line " +
                         (l.line + 1)
                       }
-                      onClick={() => setEdit({ kind: "delete", ids: [l.id] })}
+                      onClick={() => {
+                        window.toolbox?.captureEdit?.(l);
+                        setEdit({ kind: "delete", ids: [l.id] });
+                      }}
                     >
                       <Trash2 size={15} />
                     </button>

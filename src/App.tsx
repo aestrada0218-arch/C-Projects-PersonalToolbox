@@ -1,3 +1,5 @@
+import { localToday } from "./expense-types";
+import { MobileWorkspaceSettings } from "./MobileWorkspaceSettings";
 import CompanionSettings from "./CompanionSettings";
 import CollectionPanel from "./CollectionPanel";
 import SellingPanel from "./SellingPanel";
@@ -30,6 +32,7 @@ import {
   ShieldCheck,
   Tag,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -43,7 +46,7 @@ import {
   Bar,
   Cell,
 } from "recharts";
-import type { Snapshot, NewOrder } from "./types";
+import type { Snapshot, NewOrder, Order } from "./types";
 const money = (n: number) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -93,6 +96,7 @@ export default function App() {
   const [range, setRange] = useState("90");
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -256,7 +260,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.9.0</span>
+            <span>v0.10.0</span>
           </div>
         </div>
       </aside>
@@ -665,9 +669,21 @@ export default function App() {
                               {page === "Orders" && (
                                 <td>
                                   <button
+                                    className="text-button"
+                                    aria-label={"Edit order " + o.name}
+                                    onClick={() => {
+                                      window.toolbox?.captureEdit?.(o);
+                                      setEditingOrder(o);
+                                      setModal(true);
+                                    }}
+                                  >
+                                    <Pencil size={16} />
+                                  </button>
+                                  <button
                                     className="text-button danger-button"
                                     aria-label={"Delete order " + o.name}
                                     onClick={() => {
+                                      window.toolbox?.captureEdit?.(o);
                                       setDeleteId(o.id);
                                       setError("");
                                     }}
@@ -727,7 +743,11 @@ export default function App() {
                 <InboxPanel orders={data.orders} onOrdersChanged={reload} />
               )}
               {page === "Settings" ? (
-                <CompanionSettings />
+                window.toolbox?.mobileMode ? (
+                  <MobileWorkspaceSettings />
+                ) : (
+                  <CompanionSettings />
+                )
               ) : (
                 plans[page] && (
                   <section className="panel planned">
@@ -750,10 +770,12 @@ export default function App() {
             <span>
               <span className="tiny-dot" />{" "}
               {window.toolbox
-                ? "Local database connected"
+                ? window.toolbox.mobileMode
+                  ? "Connected to Windows database"
+                  : "Local database connected"
                 : "Desktop connection required"}
             </span>
-            <span>v0.9.0 · Sample data included.</span>
+            <span>v0.10.0 · Sample data included.</span>
           </footer>
         </main>
       </div>
@@ -785,9 +807,11 @@ export default function App() {
                     setData(await window.toolbox!.deleteOrder(deleteId));
                     setDeleteId(null);
                     setNotice("Order deleted.");
-                  } catch {
+                  } catch (error) {
                     setError(
-                      "Could not delete this order. Check storage permissions and retry.",
+                      error instanceof Error
+                        ? error.message
+                        : "Could not delete this order.",
                     );
                   } finally {
                     setDeleting(false);
@@ -802,13 +826,29 @@ export default function App() {
       )}
       {modal && (
         <OrderModal
-          onClose={() => setModal(false)}
+          initial={editingOrder || undefined}
+          onClose={() => {
+            setModal(false);
+            setEditingOrder(null);
+          }}
           onSave={async (order) => {
             if (!window.toolbox)
               throw Error("Open the desktop app to save orders.");
-            setData(await window.toolbox.addOrder(order));
-            setNotice("Order saved to your local database.");
+            setData(
+              editingOrder
+                ? await window.toolbox.updateOrder({
+                    id: editingOrder.id,
+                    item: order,
+                  })
+                : await window.toolbox.addOrder(order),
+            );
+            setNotice(
+              editingOrder
+                ? "Order updated."
+                : "Order saved to your local database.",
+            );
             setModal(false);
+            setEditingOrder(null);
           }}
         />
       )}
@@ -816,9 +856,11 @@ export default function App() {
   );
 }
 function OrderModal({
+  initial,
   onClose,
   onSave,
 }: {
+  initial?: Order;
   onClose: () => void;
   onSave: (o: NewOrder) => Promise<void>;
 }) {
@@ -856,7 +898,7 @@ function OrderModal({
         className="modal"
       >
         <div className="panel-heading">
-          <h2 id="modal-title">Add an order</h2>
+          <h2 id="modal-title">{initial ? "Edit order" : "Add an order"}</h2>
           <button aria-label="Close dialog" disabled={saving} onClick={onClose}>
             <X size={19} />
           </button>
@@ -890,6 +932,7 @@ function OrderModal({
             <input
               autoFocus
               name="name"
+              defaultValue={initial?.name}
               maxLength={120}
               required
               placeholder="e.g. Air Jordan 1 Retro High"
@@ -900,6 +943,7 @@ function OrderModal({
               Store
               <input
                 name="store"
+                defaultValue={initial?.store}
                 maxLength={80}
                 required
                 placeholder="e.g. Nike"
@@ -907,7 +951,17 @@ function OrderModal({
             </label>
             <label>
               Category
-              <select name="category">
+              <select name="category" defaultValue={initial?.category}>
+                {initial?.category &&
+                  ![
+                    "Sneakers",
+                    "Trading cards",
+                    "Art & figures",
+                    "Collectibles",
+                    "Other",
+                  ].includes(initial.category) && (
+                    <option>{initial.category}</option>
+                  )}
                 {[
                   "Sneakers",
                   "Trading cards",
@@ -923,6 +977,7 @@ function OrderModal({
               Total cost (USD)
               <input
                 name="total"
+                defaultValue={initial?.total}
                 type="number"
                 min="0"
                 max="10000000"
@@ -936,14 +991,14 @@ function OrderModal({
               <input
                 name="date"
                 type="date"
-                defaultValue={new Date().toISOString().slice(0, 10)}
+                defaultValue={initial?.date || localToday()}
                 required
               />
             </label>
           </div>
           <label>
             Status
-            <select name="status">
+            <select name="status" defaultValue={initial?.status}>
               {["Processing", "In transit", "Delivered", "Cancelled"].map(
                 (s) => (
                   <option key={s}>{s}</option>

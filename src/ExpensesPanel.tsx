@@ -1,3 +1,4 @@
+import { operationError } from "./operation-error";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   DollarSign,
@@ -114,9 +115,12 @@ export default function ExpensesPanel() {
       );
       setModal(null);
       return true;
-    } catch {
+    } catch (error) {
       setError(
-        "The expense service could not complete this request. Check storage permissions and retry.",
+        operationError(
+          error,
+          "The expense service could not complete this request. Check storage permissions and retry.",
+        ),
       );
       return false;
     } finally {
@@ -125,6 +129,7 @@ export default function ExpensesPanel() {
     }
   }
   const open = (value: Modal) => {
+    window.toolbox?.captureEdit?.(value);
     setError("");
     setModal(value);
   };

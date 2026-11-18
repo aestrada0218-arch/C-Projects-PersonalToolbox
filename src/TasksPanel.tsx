@@ -1,3 +1,4 @@
+import { operationError } from "./operation-error";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ListTodo,
@@ -129,9 +130,12 @@ export default function TasksPanel({
       setModal(null);
       onChanged();
       return true;
-    } catch {
+    } catch (error) {
       setError(
-        "Could not complete this request. Check the connection and try again.",
+        operationError(
+          error,
+          "Could not complete this request. Check the connection and try again.",
+        ),
       );
       return false;
     } finally {
@@ -153,8 +157,9 @@ export default function TasksPanel({
   );
   const pages = Math.max(1, Math.ceil(matching.length / 25)),
     current = Math.min(page, pages);
-  const changeStatus = (item: ShippingTask, status: ShippingStatus) =>
-    action(
+  const changeStatus = (item: ShippingTask, status: ShippingStatus) => {
+    window.toolbox?.captureEdit?.(item);
+    return action(
       () =>
         window.toolbox!.editShippingTask({
           id: item.id,
@@ -164,6 +169,7 @@ export default function TasksPanel({
         ? "Task marked shipped. No change was sent to eBay."
         : "Task returned to Needs Shipment.",
     );
+  };
   if (loading)
     return <div className="panel loading">Loading your shipping tasks…</div>;
   return (
@@ -583,7 +589,10 @@ export default function TasksPanel({
                               className="text-button"
                               aria-label={`Edit shipping task ${item.name}`}
                               disabled={disabled}
-                              onClick={() => setModal({ kind: "edit", item })}
+                              onClick={() => {
+                                window.toolbox?.captureEdit?.(item);
+                                setModal({ kind: "edit", item });
+                              }}
                             >
                               <Pencil size={15} />
                             </button>
@@ -591,7 +600,10 @@ export default function TasksPanel({
                               className="text-button"
                               aria-label={`Delete shipping task ${item.name}`}
                               disabled={disabled}
-                              onClick={() => setModal({ kind: "delete", item })}
+                              onClick={() => {
+                                window.toolbox?.captureEdit?.(item);
+                                setModal({ kind: "delete", item });
+                              }}
                             >
                               <Trash2 size={15} />
                             </button>

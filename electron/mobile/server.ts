@@ -1,3 +1,4 @@
+import { WorkspaceError } from "./workspace";
 import {
   createServer,
   type Server,
@@ -70,6 +71,7 @@ export class CompanionServer {
     private store: Store,
     private assets: string,
     private port = 17863,
+    private workspace?: (deviceId: string, input: unknown) => Promise<unknown>,
   ) {}
   status(): CompanionStatus {
     this.prune();
@@ -111,7 +113,7 @@ export class CompanionServer {
             else res.destroy();
           }),
       );
-      server.requestTimeout = 15000;
+      server.requestTimeout = 30000;
       server.headersTimeout = 10000;
       server.maxHeadersCount = 30;
       server.keepAliveTimeout = 5000;
@@ -180,7 +182,7 @@ export class CompanionServer {
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://tcgplayer-cdn.tcgplayer.com/product/; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
     );
     res.setHeader(
       "Permissions-Policy",
@@ -192,7 +194,7 @@ export class CompanionServer {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(JSON.stringify(value));
   }
-  private async body(req: IncomingMessage) {
+  private async body(req: IncomingMessage, limit = 16384) {
     if (req.headers["content-type"]?.split(";")[0] !== "application/json")
       throw Error("BODY_INVALID");
     let size = 0;
@@ -200,7 +202,7 @@ export class CompanionServer {
     for await (const c of req) {
       const b = Buffer.from(c);
       size += b.length;
-      if (size > 16384) throw Error("BODY_INVALID");
+      if (size > limit) throw Error("BODY_INVALID");
       chunks.push(b);
     }
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
@@ -222,18 +224,16 @@ export class CompanionServer {
     return {
       today: expenses.today,
       updatedAt: new Date().toISOString(),
-      collection: this.store.collection
-        .items()
-        .map((i) => ({
-          id: i.id,
-          name: i.name,
-          category: i.category,
-          collectionType: i.collectionType,
-          quantity: i.quantity,
-          purchaseCents: i.purchaseCents,
-          valueCents: i.valueCents,
-          purchaseDate: i.purchaseDate || null,
-        })),
+      collection: this.store.collection.items().map((i) => ({
+        id: i.id,
+        name: i.name,
+        category: i.category,
+        collectionType: i.collectionType,
+        quantity: i.quantity,
+        purchaseCents: i.purchaseCents,
+        valueCents: i.valueCents,
+        purchaseDate: i.purchaseDate || null,
+      })),
       outstanding: this.store.mail
         .lines()
         .filter((i) => i.receivedQty < i.quantity)
@@ -247,16 +247,14 @@ export class CompanionServer {
           expectedDate: i.expectedDate,
           version: version(i),
         })),
-      tasks: this.store.shipping
-        .items()
-        .map((i) => ({
-          id: i.id,
-          name: i.name,
-          shipBy: i.shipBy,
-          status: i.status,
-          orderReference: i.orderReference,
-          version: version(i),
-        })),
+      tasks: this.store.shipping.items().map((i) => ({
+        id: i.id,
+        name: i.name,
+        shipBy: i.shipBy,
+        status: i.status,
+        orderReference: i.orderReference,
+        version: version(i),
+      })),
       expenses: expenses.entries.map((e) => ({
         id: e.id,
         description: e.description,
@@ -364,7 +362,11 @@ export class CompanionServer {
           "Set-Cookie",
           `__Host-toolbox=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${ttl / 1000}`,
         );
-        this.json(res, 200, { csrf: device.csrf, name: device.name });
+        this.json(res, 200, {
+          csrf: device.csrf,
+          name: device.name,
+          workspace: !!this.workspace,
+        });
         return;
       }
       const session = this.session(req);
@@ -375,7 +377,11 @@ export class CompanionServer {
         return;
       }
       if (req.method === "GET" && url.pathname === "/api/session") {
-        this.json(res, 200, { csrf: session.csrf, name: session.name });
+        this.json(res, 200, {
+          csrf: session.csrf,
+          name: session.name,
+          workspace: !!this.workspace,
+        });
         return;
       }
       if (req.method === "GET" && url.pathname === "/api/snapshot") {
@@ -402,11 +408,25 @@ export class CompanionServer {
         return;
       }
       try {
-        const input = await this.body(req);
+        const input = await this.body(
+          req,
+          url.pathname === "/api/workspace" ? 20 * 1024 * 1024 : 16384,
+        );
         if (!this.server || this.devices.get(session.tokenHash) !== session) {
           this.json(res, 401, {
             error: "This device was unpaired. Pair again on your PC.",
           });
+          return;
+        }
+        if (url.pathname === "/api/workspace") {
+          if (!this.workspace) {
+            this.json(res, 404, {
+              error:
+                "Update your desktop app to enable the full mobile workspace.",
+            });
+            return;
+          }
+          this.json(res, 200, await this.workspace(session.id, input));
           return;
         }
         if (url.pathname === "/api/expected-date") {
@@ -478,10 +498,12 @@ export class CompanionServer {
           return;
         }
         this.json(res, 200, this.snapshot());
-      } catch {
-        this.json(res, 400, {
+      } catch (error) {
+        this.json(res, error instanceof WorkspaceError ? error.status : 400, {
           error:
-            "Could not save this change. Check the fields and refresh the latest data before retrying.",
+            error instanceof WorkspaceError
+              ? error.message
+              : "Could not save this change. Check the fields and refresh the latest data before retrying.",
         });
       }
       return;

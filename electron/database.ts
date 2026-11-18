@@ -323,6 +323,29 @@ export class Store {
     }
     return this.snapshot();
   }
+  updateOrder(input: unknown) {
+    const { id, item } = z
+      .object({ id: z.string().uuid(), item: orderSchema })
+      .strict()
+      .parse(input);
+    this.mutate(() => {
+      if (!this.snapshot().orders.some((o) => o.id === id))
+        throw Error("Order missing");
+      this.db.run(
+        "UPDATE orders SET name=?,store=?,category=?,total=?,status=?,date=? WHERE id=?",
+        [
+          item.name,
+          item.store,
+          item.category,
+          item.total,
+          item.status,
+          item.date,
+          id,
+        ],
+      );
+    });
+    return this.snapshot();
+  }
   deleteOrder(input: unknown) {
     const id = z.string().uuid().parse(input);
     this.mutate(() => {
