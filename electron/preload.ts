@@ -98,6 +98,8 @@ contextBridge.exposeInMainWorld(
     disconnectGmail: () => ipcRenderer.invoke("toolbox:disconnect-gmail"),
     setInboxAuto: (enabled: unknown) =>
       ipcRenderer.invoke("toolbox:inbox-auto", enabled),
+    deleteEmailUpdate: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:delete-email-update", id),
     linkEmailUpdate: (input: unknown) =>
       ipcRenderer.invoke("toolbox:link-email-update", input),
     linkShipment: (input: unknown) =>

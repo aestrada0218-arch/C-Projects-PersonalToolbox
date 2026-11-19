@@ -1,4 +1,4 @@
-# Personal Toolbox · v0.11.0
+# Personal Toolbox · v0.11.1
 
 A Windows desktop app built with Electron, React, TypeScript, Vite, Tailwind CSS, SQLite (sql.js), Recharts, and Playwright. Original dark-and-gold interface. Version 0.6 adds direct eBay fixed-price selling, shared drafts, exact Mercari listing links, and persistent cross-listing follow-ups. Version 0.5 added eBay-email shipping tasks with ship-by dates and scheduled Gmail checks. Version 0.4.1 added illustrated card search and full-title matching. Version 0.4 added a multi-section collection, JustTCG catalog/pricing, saved quote history, and an isolated interactive TCGplayer catalog browser. The categorized expense ledger and recurring bookkeeping remain available.
 
@@ -357,3 +357,9 @@ Click a bar or an accessible category button in **Analytics → Collection break
 The shared pagination module replaces repeated table slicing, page-count calculations and footer controls; shared pager styling is defined once. Outstanding **Select all matching lines** still selects matching records across all pages, with the total selected count and existing delete confirmation. Search/received-filter changes clear that selection. No database migration, credential changes or pairing reset is required.
 
 Tests include 231 orders and 61 collection entries to exercise both page sizes, page/filter resets, search beyond the former 200-row cutoff, manual URL opening and exact category navigation, plus reference-URL validation and the existing desktop/phone suite.
+
+## v0.11.1 — delete email updates without tracking
+
+Inbox's **Email updates without tracking** rows now have **Delete update** on Windows and the full iPhone companion. Confirmation explains the scope before deletion. Removing a review update leaves the source email, linked order, shipment history and account connection untouched. A retained external-ID deletion marker suppresses the same update on later scans. Delete failures leave the row and marker unchanged together; phone deletes reject a record changed on Windows and use existing request deduplication. Successful changes refresh the desktop through the existing database change signal.
+
+Schema 11 adds `inbox_update_dismissals` and creates a `.pre-inbox-deletion-v10.bak` backup before upgrading an existing database. Existing rows/data and companion pairing are preserved. Tests cover schema-10 upgrade, persistence, retained linked orders, rescanning, failed storage rollback, stale phone deletes, retry deduplication and real desktop/phone confirmation/cancellation flows. Sold-comparable pricing is not included; existing manual values and JustTCG pricing are unchanged.

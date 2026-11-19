@@ -1,13 +1,13 @@
 # Add Personal Toolbox to your iPhone
 
-This is a private mobile web companion. No App Store account or Mac is needed. Your existing Windows app remains the source of truth and must stay open on an awake PC. Version 0.11 opens the **full toolbox** by default after pairing, using the same editors and validation as Windows:
+This is a private mobile web companion. No App Store account or Mac is needed. Your existing Windows app remains the source of truth and must stay open on an awake PC. Version 0.11.1 opens the **full toolbox** by default after pairing, using the same editors and validation as Windows:
 
 - Orders: add, edit, search, delete and export CSV.
 - Collection: search cards, add items, edit quantities/prices/sections, attach photos, delete items and refresh values.
 - Outstanding orders: scan connected mailboxes, receive items, set expected-arrival dates and select/delete multiple lines.
 - Expenses: add/edit/delete charges, manage recurring schedules and import/export CSV with preview.
 - Tasks: add/edit/delete shipment tasks and update their status.
-- Inbox: connect and manage Gmail/IMAP inboxes and run supported checks.
+- Inbox: connect and manage Gmail/IMAP inboxes, run supported checks and delete untracked email updates after confirmation. Deletion removes the Toolbox record only and prevents re-import of the same update.
 - Selling: manage drafts, add photos and use the existing eBay and assisted Mercari controls, including the same publish confirmations.
 
 **Quick view** remains available for the compact companion. Phone changes save to the same database immediately. Connecting an account from the phone sends its credential over your private HTTPS connection to Windows Credential Manager; saved passwords and API keys are never returned to the phone.
@@ -22,7 +22,7 @@ npm install
 npm run dev
 ```
 
-Development startup now builds the companion assets automatically. For a production build use `npm run build` followed by `npm start`. The mobile companion remains disabled until you first enable it in Settings. After that it starts automatically with Personal Toolbox; Pause turns automatic startup off. No new database migration is needed when upgrading from v0.9 to v0.10. Your existing Tailscale Serve configuration can stay in place. After updating Windows, refresh/reopen the iPhone app and pair again if prompted.
+Development startup now builds the companion assets automatically. For a production build use `npm run build` followed by `npm start`. The mobile companion remains disabled until you first enable it in Settings. After that it starts automatically with Personal Toolbox; Pause turns automatic startup off. Version 0.11.1 upgrades the database automatically and makes a pre-upgrade backup; existing records and pairing settings are preserved. Your existing Tailscale Serve configuration can stay in place. After updating Windows, refresh/reopen the iPhone app and pair again if prompted.
 
 ## 2. Connect your devices privately
 

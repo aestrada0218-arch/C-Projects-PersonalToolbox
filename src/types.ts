@@ -202,6 +202,7 @@ export interface ToolboxAPI {
   refreshInbox(): Promise<InboxResult>;
   disconnectGmail(): Promise<InboxResult>;
   setInboxAuto(enabled: boolean): Promise<InboxResult>;
+  deleteEmailUpdate(id: string): Promise<InboxResult>;
   linkEmailUpdate(input: {
     updateId: string;
     orderId: string;

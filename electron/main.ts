@@ -200,6 +200,7 @@ else {
           : inbox.disconnect(),
       );
       handle("toolbox:inbox-auto", (value) => inbox.setAuto(value));
+      handle("toolbox:delete-email-update", (id) => inbox.deleteUpdate(id));
       handle("toolbox:link-email-update", (input) => inbox.linkUpdate(input));
       handle("toolbox:link-shipment", (input) => inbox.link(input));
       inbox.start();

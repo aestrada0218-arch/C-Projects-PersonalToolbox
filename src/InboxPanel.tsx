@@ -1,9 +1,11 @@
+import { operationError } from "./operation-error";
 import { Pagination, usePagination } from "./pagination";
 import { listenForDataChanges } from "./data-changes";
 import { MailboxManager } from "./MailboxPanels";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Mail,
+  Trash2,
   RefreshCw,
   ShieldCheck,
   Truck,
@@ -35,6 +37,7 @@ export default function InboxPanel({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState<EmailUpdate | null>(null);
   const [showConnect, setShowConnect] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [query, setQuery] = useState("");
@@ -78,8 +81,13 @@ export default function InboxPanel({
         setConfirmDisconnect(false);
         return true;
       }
-    } catch {
-      setError("Unable to contact the desktop inbox service. Try again.");
+    } catch (error) {
+      setError(
+        operationError(
+          error,
+          "Unable to contact the desktop inbox service. Try again.",
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -103,6 +111,26 @@ export default function InboxPanel({
     return <div className="panel loading">Loading your shipment inbox…</div>;
   return (
     <div className="inbox-module">
+      {deleting && (
+        <DeleteEmailDialog
+          update={deleting}
+          busy={busy}
+          error={error}
+          onCancel={() => {
+            if (!busy) setDeleting(null);
+          }}
+          onDelete={async () => {
+            if (
+              await action(
+                () => window.toolbox!.deleteEmailUpdate(deleting.id),
+                "Email update deleted from Toolbox.",
+              )
+            )
+              setDeleting(null);
+          }}
+        />
+      )}
+
       <section className="panel inbox-intro">
         <span className="gmail-icon">
           <Mail size={26} />
@@ -331,6 +359,11 @@ export default function InboxPanel({
                 update={update}
                 orders={orders}
                 disabled={disabled}
+                onDelete={() => {
+                  window.toolbox?.captureEdit?.(update);
+                  setError("");
+                  setDeleting(update);
+                }}
                 onApply={async (orderId) => {
                   const ok = await action(
                     () =>
@@ -548,11 +581,13 @@ function EmailUpdateRow({
   orders,
   disabled,
   onApply,
+  onDelete,
 }: {
   update: EmailUpdate;
   orders: Order[];
   disabled: boolean;
   onApply: (id: string) => Promise<void>;
+  onDelete: () => void;
 }) {
   const [selected, setSelected] = useState(u.orderId || "");
   return (
@@ -572,6 +607,14 @@ function EmailUpdateRow({
         </small>
       </div>
       <div className="shipment-apply">
+        <button
+          className="text-button danger-button"
+          disabled={disabled}
+          aria-label={`Delete email update ${u.subject}`}
+          onClick={onDelete}
+        >
+          <Trash2 size={14} /> Delete update
+        </button>
         <select
           aria-label={"Order for email " + u.id}
           value={selected}
@@ -596,5 +639,61 @@ function EmailUpdateRow({
         </button>
       </div>
     </article>
+  );
+}
+
+function DeleteEmailDialog({
+  update,
+  busy,
+  error,
+  onCancel,
+  onDelete,
+}: {
+  update: EmailUpdate;
+  busy: boolean;
+  error: string;
+  onCancel: () => void;
+  onDelete: () => Promise<void>;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const element = dialog.current!;
+    element.showModal();
+    return () => element.close();
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      className="modal expense-dialog"
+      aria-labelledby="delete-email-title"
+      onCancel={(e) => {
+        e.preventDefault();
+        onCancel();
+      }}
+    >
+      <h2 id="delete-email-title">Delete email update?</h2>
+      <p>{update.subject}</p>
+      <p>
+        This removes the update from Toolbox. Your email and linked order stay
+        unchanged. Scanning again will not restore this same update.
+      </p>
+      {error && (
+        <p className="alert" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="modal-actions">
+        <button disabled={busy} onClick={onCancel}>
+          Cancel
+        </button>
+        <button
+          className="danger-button"
+          disabled={busy}
+          onClick={() => void onDelete()}
+        >
+          {busy ? "Deleting…" : "Delete update"}
+        </button>
+      </div>
+    </dialog>
   );
 }

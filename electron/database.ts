@@ -106,7 +106,7 @@ export class Store {
     const version =
       this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
     // v0.7 only added separate entry tables; retain them when rolling back.
-    if (Number(version) > 10) throw new Error("Unsupported database version");
+    if (Number(version) > 11) throw new Error("Unsupported database version");
     if (Number(version) < 1) {
       this.db.run(
         `BEGIN; CREATE TABLE orders(id TEXT PRIMARY KEY,name TEXT NOT NULL,store TEXT NOT NULL,category TEXT NOT NULL,total REAL NOT NULL CHECK(total>=0),status TEXT NOT NULL CHECK(status IN ('Delivered','In transit','Processing','Cancelled')),date TEXT NOT NULL); CREATE TABLE collection(id TEXT PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),purchase REAL NOT NULL,market REAL NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO migrations VALUES(1);`,
@@ -244,6 +244,22 @@ export class Store {
         "BEGIN;" +
           outstandingMigration +
           "INSERT INTO migrations VALUES(10);COMMIT;",
+      );
+      this.persist();
+    }
+    if (Number(version) < 11) {
+      if (
+        this.path &&
+        Number(version) > 0 &&
+        !existsSync(this.path + ".pre-inbox-deletion-v10.bak")
+      )
+        writeFileSync(
+          this.path + ".pre-inbox-deletion-v10.bak",
+          this.db.export(),
+          { flag: "wx", mode: 0o600 },
+        );
+      this.db.run(
+        "BEGIN; CREATE TABLE IF NOT EXISTS inbox_update_dismissals(externalId TEXT PRIMARY KEY,deletedAt TEXT NOT NULL); INSERT INTO migrations VALUES(11); COMMIT;",
       );
       this.persist();
     }
@@ -421,7 +437,7 @@ export class Store {
     }
     for (const u of scan.updates || []) {
       this.db.run(
-        "INSERT INTO inbox_updates(id,externalId,subject,received,status,orderReference) VALUES(?,?,?,?,?,?) ON CONFLICT(externalId) DO NOTHING",
+        "INSERT INTO inbox_updates(id,externalId,subject,received,status,orderReference) SELECT ?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM inbox_update_dismissals WHERE externalId=?) ON CONFLICT(externalId) DO NOTHING",
         [
           randomUUID(),
           u.externalId,
@@ -429,6 +445,7 @@ export class Store {
           u.received,
           u.status,
           u.orderReference,
+          u.externalId,
         ],
       );
     }
@@ -464,6 +481,18 @@ export class Store {
     return this.rows("inbox_updates").sort((a, b) =>
       String(b.received).localeCompare(String(a.received)),
     ) as unknown as EmailUpdate[];
+  }
+  deleteEmailUpdate(input: unknown) {
+    const id = z.string().uuid().parse(input);
+    this.mutate(() => {
+      const update = this.emailUpdates().find((u) => u.id === id);
+      if (!update) throw Error("UPDATE_MISSING");
+      this.db.run(
+        "INSERT INTO inbox_update_dismissals(externalId,deletedAt) VALUES(?,?) ON CONFLICT(externalId) DO NOTHING",
+        [update.externalId, new Date().toISOString()],
+      );
+      this.db.run("DELETE FROM inbox_updates WHERE id=?", [id]);
+    });
   }
   applyEmailUpdate(input: unknown) {
     const { updateId, orderId } = z

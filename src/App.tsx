@@ -298,7 +298,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.11.0</span>
+            <span>v0.11.1</span>
           </div>
         </div>
       </aside>
@@ -838,7 +838,7 @@ export default function App() {
                   : "Local database connected"
                 : "Desktop connection required"}
             </span>
-            <span>v0.11.0 · Sample data included.</span>
+            <span>v0.11.1 · Sample data included.</span>
           </footer>
         </main>
       </div>

@@ -271,6 +271,7 @@ export function createMobileWorkspaceApi(
     "refreshInbox",
     "setInboxAuto",
     "linkEmailUpdate",
+    "deleteEmailUpdate",
     "linkShipment",
     "sellingState",
     "sellingCategory",

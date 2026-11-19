@@ -50,7 +50,7 @@ it("upgrades a v9 database preserving receipt identities and cursor progress wit
       }),
       raw = new SQL.Database(readFileSync(file));
     raw.run(
-      "ALTER TABLE outstanding_orders DROP COLUMN expectedDate; ALTER TABLE outstanding_orders DROP COLUMN deletedAt; DELETE FROM migrations WHERE version=10;",
+      "ALTER TABLE outstanding_orders DROP COLUMN expectedDate; ALTER TABLE outstanding_orders DROP COLUMN deletedAt; DROP TABLE IF EXISTS inbox_update_dismissals; DELETE FROM migrations WHERE version>=10;",
     );
     writeFileSync(file, raw.export());
     raw.close();

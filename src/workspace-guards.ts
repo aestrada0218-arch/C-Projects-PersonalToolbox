@@ -2,6 +2,7 @@
 export const workspaceGuards: Record<string, string> = {
   updateOrder: "order",
   deleteOrder: "order",
+  deleteEmailUpdate: "email-update",
   editCollectible: "collection",
   deleteCollectible: "collection",
   editExpense: "expense",

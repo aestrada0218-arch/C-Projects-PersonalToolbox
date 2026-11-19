@@ -113,6 +113,19 @@ export async function createWorkspaceFixture(file?: string) {
     syncing: false,
     supported: false,
   }));
+  actions.set("toolbox:delete-email-update", (id) => {
+    db.deleteEmailUpdate(id);
+    return {
+      ok: true,
+      state: {
+        account: null,
+        shipments: db.shipments(),
+        updates: db.emailUpdates(),
+        syncing: false,
+        supported: false,
+      },
+    };
+  });
   actions.set("toolbox:selling-state", selling);
   actions.set("toolbox:selling-create", (v) => {
     db.selling.create(v);

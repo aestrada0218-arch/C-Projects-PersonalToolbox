@@ -318,6 +318,17 @@ export class InboxService {
       return this.result(errors.storage);
     }
   }
+  deleteUpdate(input: unknown) {
+    if (this.busy) return this.result(errors.busy);
+    try {
+      this.store.deleteEmailUpdate(input);
+      return this.result();
+    } catch {
+      return this.result(
+        "Could not delete this email update. Refresh the inbox and check storage permissions.",
+      );
+    }
+  }
   linkUpdate(input: unknown) {
     if (this.busy) return this.result(errors.busy);
     try {

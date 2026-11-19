@@ -170,6 +170,11 @@ export const workspaceMethods: Record<string, Descriptor> = {
   disconnectGmail: { channel: "toolbox:disconnect-gmail", state: "inboxState" },
   refreshInbox: { channel: "toolbox:refresh-inbox", state: "inboxState" },
   setInboxAuto: { channel: "toolbox:inbox-auto", state: "inboxState" },
+  deleteEmailUpdate: {
+    channel: "toolbox:delete-email-update",
+    state: "inboxState",
+    resource: "email-update",
+  },
   linkEmailUpdate: {
     channel: "toolbox:link-email-update",
     state: "inboxState",
@@ -311,6 +316,7 @@ export class WorkspaceGateway {
         if (row && typeof row.id === "string")
           versions[key + ":" + row.id] = digest(row);
     };
+    if (kind === "inboxState") rows("email-update", state.updates);
     if (kind === "snapshot") rows("order", state.orders);
     if (kind === "collectionState") rows("collection", state.items);
     if (kind === "expenseState") {
@@ -326,6 +332,8 @@ export class WorkspaceGateway {
   private current(key: string): unknown {
     const [kind, id] = key.split(":");
     switch (kind) {
+      case "email-update":
+        return this.store.emailUpdates().find((i) => i.id === id);
       case "order":
         return this.store.snapshot().orders.find((i) => i.id === id);
       case "collection":
