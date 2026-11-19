@@ -1,3 +1,4 @@
+import { Pagination, usePagination } from "./pagination";
 import { listenForDataChanges } from "./data-changes";
 import { operationError } from "./operation-error";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -18,8 +19,6 @@ import {
   Trash2,
   Pencil,
   X,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import {
   expenseCategories,
@@ -64,7 +63,6 @@ export default function ExpensesPanel() {
   const [notice, setNotice] = useState("");
   const [tab, setTab] = useState<ExpenseCategory | "All">("All");
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
   const [modal, setModal] = useState<Modal | null>(null);
   const [stopSeries, setStopSeries] = useState(true);
   const running = useRef(false);
@@ -143,9 +141,9 @@ export default function ExpensesPanel() {
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
-  const lastPage = Math.max(1, Math.ceil(filtered.length / 25));
-  const current = Math.min(page, lastPage);
-  const visible = filtered.slice((current - 1) * 25, current * 25);
+  const pagination = usePagination(filtered, JSON.stringify([tab, query]));
+  const { setPage } = pagination;
+  const visible = pagination.visible;
   const activeSchedules = state.schedules.filter((s) => s.active);
   const shownSchedules = activeSchedules.filter(
     (s) =>
@@ -153,6 +151,10 @@ export default function ExpensesPanel() {
       (s.description + " " + s.provider + " " + s.retailer)
         .toLowerCase()
         .includes(query.toLowerCase()),
+  );
+  const schedulePagination = usePagination(
+    shownSchedules,
+    JSON.stringify([tab, query]),
   );
   const filteredTotal = filtered
     .filter((e) => e.date <= state.today)
@@ -515,30 +517,8 @@ export default function ExpensesPanel() {
           )}
         </div>
         <div className="table-bottom">
-          <span>
-            Showing {filtered.length ? (current - 1) * 25 + 1 : 0}–
-            {Math.min(current * 25, filtered.length)} of {filtered.length}{" "}
-            entries · USD
-          </span>
-          <div className="expense-pagination">
-            <button
-              aria-label="Previous expense page"
-              disabled={current <= 1}
-              onClick={() => setPage(current - 1)}
-            >
-              <ChevronLeft size={15} />
-            </button>
-            <span>
-              {current} / {lastPage}
-            </span>
-            <button
-              aria-label="Next expense page"
-              disabled={current >= lastPage}
-              onClick={() => setPage(current + 1)}
-            >
-              <ChevronRight size={15} />
-            </button>
-          </div>
+          <span>Entries · USD</span>
+          <Pagination value={pagination} label="expense" />
         </div>
       </section>
       {!!shownSchedules.length && (
@@ -567,7 +547,7 @@ export default function ExpensesPanel() {
                 </tr>
               </thead>
               <tbody>
-                {shownSchedules.map((s) => (
+                {schedulePagination.visible.map((s) => (
                   <tr key={s.id}>
                     <td className="expense-description">
                       {s.description}
@@ -607,6 +587,9 @@ export default function ExpensesPanel() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="table-bottom">
+            <Pagination value={schedulePagination} label="recurring schedule" />
           </div>
         </section>
       )}

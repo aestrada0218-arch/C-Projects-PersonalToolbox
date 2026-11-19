@@ -1,4 +1,4 @@
-# Personal Toolbox · v0.10.2
+# Personal Toolbox · v0.11.0
 
 A Windows desktop app built with Electron, React, TypeScript, Vite, Tailwind CSS, SQLite (sql.js), Recharts, and Playwright. Original dark-and-gold interface. Version 0.6 adds direct eBay fixed-price selling, shared drafts, exact Mercari listing links, and persistent cross-listing follow-ups. Version 0.5 added eBay-email shipping tasks with ship-by dates and scheduled Gmail checks. Version 0.4.1 added illustrated card search and full-title matching. Version 0.4 added a multi-section collection, JustTCG catalog/pricing, saved quote history, and an isolated interactive TCGplayer catalog browser. The categorized expense ledger and recurring bookkeeping remain available.
 
@@ -345,3 +345,15 @@ Tests cover real-file restore, auto-enable, retained URL/phones after pause, per
 A committed database write now sends a fixed, data-free notification to the trusted desktop renderer. The dashboard/Orders and each open data panel reload their local state promptly instead of retaining a startup snapshot or waiting for a polling interval. Database writes from the companion and background services use the same mechanism. Notifications are coalesced during bursts, sent only after a successful save and cleaned up on shutdown. Focus/visibility refresh also catches up a restored desktop window. Existing service status polling remains available.
 
 Refresh updates view data without remounting panels, resetting searches or replacing an unfinished form. A failed database write emits no change notification; a failed view listener cannot undo a committed save. Tests cover notification ordering, rollback, unsubscribe and an actual paired phone editing/adding/deleting while the Electron desktop remains open, including a desktop expense draft that stays intact. No database migration or pairing reset is needed.
+
+## v0.11 — consistent pagination, reference links and collection navigation
+
+Local record lists start at 25 entries per page and offer 50 through **Rows per page**. Orders, collection inventory, outstanding orders, expenses/recurring schedules, shipment tasks, selling copies and inbox email/shipments use a shared pagination hook and controls. Search/category/status filters run over all loaded records in the selected tab before paging; changing a filter or page size returns to the first page, and deleting the last page safely clamps the visible page. Orders no longer has a 200-row display cutoff. The dashboard's recent-orders preview remains five rows. JustTCG remote catalog results retain their provider-supported 20-result request size and existing navigation; local inventory pagination does not consume provider requests.
+
+Manual collection entries now expose **Open reference**, and linked cards retain their TCGplayer product link. Windows validates the saved item's ID and stored HTTPS URL before opening the system browser. The phone resolves the same saved reference through a narrow read-only capability and opens it in the browser. Credentials, non-HTTPS schemes and arbitrary unsaved IPC URL inputs are rejected.
+
+Click a bar or an accessible category button in **Analytics → Collection breakdown** to open Collection filtered to that exact category across all collection sections. A visible category indicator and **Clear category filter** control make the filter explicit. The breakdown is also available in the phone's full workspace.
+
+The shared pagination module replaces repeated table slicing, page-count calculations and footer controls; shared pager styling is defined once. Outstanding **Select all matching lines** still selects matching records across all pages, with the total selected count and existing delete confirmation. Search/received-filter changes clear that selection. No database migration, credential changes or pairing reset is required.
+
+Tests include 231 orders and 61 collection entries to exercise both page sizes, page/filter resets, search beyond the former 200-row cutoff, manual URL opening and exact category navigation, plus reference-URL validation and the existing desktop/phone suite.

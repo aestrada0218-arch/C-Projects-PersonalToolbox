@@ -1,6 +1,6 @@
 # Add Personal Toolbox to your iPhone
 
-This is a private mobile web companion. No App Store account or Mac is needed. Your existing Windows app remains the source of truth and must stay open on an awake PC. Version 0.10.2 opens the **full toolbox** by default after pairing, using the same editors and validation as Windows:
+This is a private mobile web companion. No App Store account or Mac is needed. Your existing Windows app remains the source of truth and must stay open on an awake PC. Version 0.11 opens the **full toolbox** by default after pairing, using the same editors and validation as Windows:
 
 - Orders: add, edit, search, delete and export CSV.
 - Collection: search cards, add items, edit quantities/prices/sections, attach photos, delete items and refresh values.
@@ -61,6 +61,8 @@ Upgrading from v0.10.0 requires entering the address and pairing once more becau
 ## Using the companion
 
 Changes save directly to the same SQLite database used by Windows. After a successful phone save, the open desktop dashboard and data panels refresh automatically, usually within a second; restarting or switching tabs is unnecessary. View refreshes preserve searches and unfinished form inputs. The full interface has touch-sized controls, horizontally scrolling navigation and tables that become labeled cards on narrow screens. Use **Refresh** when needed. **Quick view** switches to the compact companion; **Full toolbox** returns to all editors.
+
+Local lists default to 25 rows with a 50-row dropdown. Search applies to all records in the selected tab before pagination. Saved collection references open their web page, and Analytics collection categories open matching inventory inside Toolbox.
 
 Phone file/photo buttons use the iPhone picker; CSV exports download in Safari. Collection photos are resized before upload. eBay listing photos are validated and processed on Windows. TCGplayer browsing opens in Safari; copy a product URL into the collection search to look it up. The embedded Windows browser's product-selection menu is available only on the PC.
 

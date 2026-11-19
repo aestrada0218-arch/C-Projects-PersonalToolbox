@@ -1,3 +1,4 @@
+import { Pagination, usePagination } from "./pagination";
 import { listenForDataChanges } from "./data-changes";
 import { localToday } from "./expense-types";
 import { MobileWorkspaceSettings } from "./MobileWorkspaceSettings";
@@ -72,6 +73,15 @@ const plans: Record<string, string> = {
 export default function App() {
   const [data, setData] = useState<Snapshot>(empty);
   const [page, setPage] = useState("Analytics");
+  const [collectionRequest, setCollectionRequest] = useState<{
+    category: string;
+    nonce: number;
+  } | null>(null);
+  const openCollectionCategory = (category: string) => {
+    setProductRequest(null);
+    setCollectionRequest({ category, nonce: Date.now() });
+    setPage("Collection");
+  };
   const [sellingRequest, setSellingRequest] = useState<{
     id: string;
     nonce: number;
@@ -214,6 +224,10 @@ export default function App() {
         .includes(query.toLowerCase()) &&
       (status === "All statuses" || o.status === status),
   );
+  const orderPagination = usePagination(
+    filtered,
+    JSON.stringify([query, status, range]),
+  );
   const exportOrders = async () => {
     try {
       if (!window.toolbox) throw Error();
@@ -258,6 +272,7 @@ export default function App() {
               key={name}
               className={page === name ? "active" : ""}
               onClick={() => {
+                if (name === "Collection") setCollectionRequest(null);
                 if (name === "Selling") setSellingRequest(null);
                 setPage(name);
                 setQuery("");
@@ -283,7 +298,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.10.2</span>
+            <span>v0.11.0</span>
           </div>
         </div>
       </aside>
@@ -551,9 +566,13 @@ export default function App() {
                               radius={[0, 4, 4, 0]}
                               barSize={13}
                             >
-                              {categories.map((_, i) => (
+                              {categories.map((category, i) => (
                                 <Cell
-                                  key={i}
+                                  key={category.name}
+                                  cursor="pointer"
+                                  onClick={() =>
+                                    openCollectionCategory(category.name)
+                                  }
                                   fill={
                                     [
                                       "#d6b56b",
@@ -568,9 +587,27 @@ export default function App() {
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
+                      <div className="collection-breakdown-links">
+                        {categories.map((category) => (
+                          <button
+                            key={category.name}
+                            className="text-button"
+                            onClick={() =>
+                              openCollectionCategory(category.name)
+                            }
+                            aria-label={`View ${category.name} collection`}
+                          >
+                            {category.name} <ArrowUpRight size={12} />
+                          </button>
+                        ))}
+                      </div>
                       <button
                         className="text-button collection-link"
-                        onClick={() => setPage("Collection")}
+                        onClick={() => {
+                          setCollectionRequest(null);
+                          setProductRequest(null);
+                          setPage("Collection");
+                        }}
                       >
                         Explore your collection <ArrowUpRight size={14} />
                       </button>
@@ -645,78 +682,79 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filtered
-                          .slice(0, page === "Analytics" ? 5 : 200)
-                          .map((o, i) => (
-                            <tr key={o.id}>
-                              <td>
-                                <div className="product">
-                                  <span
-                                    className={"product-icon color-" + (i % 4)}
-                                  >
-                                    <Package size={21} />
-                                  </span>
-                                  <div>
-                                    {o.name}
-                                    <small>
-                                      {o.category}{" "}
-                                      <span>
-                                        · #{o.id.slice(0, 8).toUpperCase()}
-                                      </span>
-                                    </small>
-                                  </div>
-                                </div>
-                              </td>
-                              <td>{o.store}</td>
-                              <td>
-                                {new Date(
-                                  o.date + "T12:00:00",
-                                ).toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                })}
-                              </td>
-                              <td>
+                        {(page === "Analytics"
+                          ? filtered.slice(0, 5)
+                          : orderPagination.visible
+                        ).map((o, i) => (
+                          <tr key={o.id}>
+                            <td>
+                              <div className="product">
                                 <span
-                                  className={
-                                    "badge " +
-                                    o.status.toLowerCase().replace(" ", "-")
-                                  }
+                                  className={"product-icon color-" + (i % 4)}
                                 >
-                                  <i />
-                                  {o.status}
+                                  <Package size={21} />
                                 </span>
+                                <div>
+                                  {o.name}
+                                  <small>
+                                    {o.category}{" "}
+                                    <span>
+                                      · #{o.id.slice(0, 8).toUpperCase()}
+                                    </span>
+                                  </small>
+                                </div>
+                              </div>
+                            </td>
+                            <td>{o.store}</td>
+                            <td>
+                              {new Date(
+                                o.date + "T12:00:00",
+                              ).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </td>
+                            <td>
+                              <span
+                                className={
+                                  "badge " +
+                                  o.status.toLowerCase().replace(" ", "-")
+                                }
+                              >
+                                <i />
+                                {o.status}
+                              </span>
+                            </td>
+                            <td className="right total">{money(o.total)}</td>
+                            {page === "Orders" && (
+                              <td>
+                                <button
+                                  className="text-button"
+                                  aria-label={"Edit order " + o.name}
+                                  onClick={() => {
+                                    window.toolbox?.captureEdit?.(o);
+                                    setEditingOrder(o);
+                                    setModal(true);
+                                  }}
+                                >
+                                  <Pencil size={16} />
+                                </button>
+                                <button
+                                  className="text-button danger-button"
+                                  aria-label={"Delete order " + o.name}
+                                  onClick={() => {
+                                    window.toolbox?.captureEdit?.(o);
+                                    setDeleteId(o.id);
+                                    setError("");
+                                  }}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
                               </td>
-                              <td className="right total">{money(o.total)}</td>
-                              {page === "Orders" && (
-                                <td>
-                                  <button
-                                    className="text-button"
-                                    aria-label={"Edit order " + o.name}
-                                    onClick={() => {
-                                      window.toolbox?.captureEdit?.(o);
-                                      setEditingOrder(o);
-                                      setModal(true);
-                                    }}
-                                  >
-                                    <Pencil size={16} />
-                                  </button>
-                                  <button
-                                    className="text-button danger-button"
-                                    aria-label={"Delete order " + o.name}
-                                    onClick={() => {
-                                      window.toolbox?.captureEdit?.(o);
-                                      setDeleteId(o.id);
-                                      setError("");
-                                    }}
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </td>
-                              )}
-                            </tr>
-                          ))}
+                            )}
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                     {!filtered.length && (
@@ -724,14 +762,15 @@ export default function App() {
                     )}
                   </div>
                   <div className="table-bottom">
-                    <span>
-                      Showing{" "}
-                      {Math.min(
-                        filtered.length,
-                        page === "Analytics" ? 5 : 200,
-                      )}{" "}
-                      of {filtered.length} orders
-                    </span>
+                    {page === "Analytics" && (
+                      <span>
+                        Showing {Math.min(filtered.length, 5)} of{" "}
+                        {filtered.length} orders
+                      </span>
+                    )}
+                    {page === "Orders" && (
+                      <Pagination value={orderPagination} label="order" />
+                    )}
                     <span>
                       <ShieldCheck size={13} /> Saved on your device
                     </span>
@@ -746,6 +785,7 @@ export default function App() {
                   }}
                   onChanged={refreshCollectionSnapshot}
                   productRequest={productRequest}
+                  categoryRequest={collectionRequest}
                 />
               )}
               {page === "Expenses" && <ExpensesPanel />}
@@ -798,7 +838,7 @@ export default function App() {
                   : "Local database connected"
                 : "Desktop connection required"}
             </span>
-            <span>v0.10.2 · Sample data included.</span>
+            <span>v0.11.0 · Sample data included.</span>
           </footer>
         </main>
       </div>

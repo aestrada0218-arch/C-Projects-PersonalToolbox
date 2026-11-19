@@ -1,3 +1,4 @@
+import { Pagination, usePagination } from "./pagination";
 import { listenForDataChanges } from "./data-changes";
 import { operationError } from "./operation-error";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -80,8 +81,7 @@ export default function TasksPanel({
   const [tab, setTab] = useState<ShippingStatus | "Automation">(
       "Needs Shipment",
     ),
-    [modal, setModal] = useState<Modal | null>(null),
-    [page, setPage] = useState(1);
+    [modal, setModal] = useState<Modal | null>(null);
   const running = useRef(false),
     revision = useRef(0);
   useEffect(() => {
@@ -158,8 +158,8 @@ export default function TasksPanel({
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
-  const pages = Math.max(1, Math.ceil(matching.length / 25)),
-    current = Math.min(page, pages);
+  const pagination = usePagination(matching, JSON.stringify([tab, query]));
+  const { setPage } = pagination;
   const changeStatus = (item: ShippingTask, status: ShippingStatus) => {
     window.toolbox?.captureEdit?.(item);
     return action(
@@ -517,103 +517,99 @@ export default function TasksPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {matching
-                    .slice((current - 1) * 25, current * 25)
-                    .map((item) => (
-                      <tr key={item.id}>
-                        <td className="shipping-name">
-                          <strong>{item.name}</strong>
-                          <small>
-                            {item.orderReference
-                              ? `Order ${item.orderReference}`
-                              : "Order number not found — review sale"}
+                  {pagination.visible.map((item) => (
+                    <tr key={item.id}>
+                      <td className="shipping-name">
+                        <strong>{item.name}</strong>
+                        <small>
+                          {item.orderReference
+                            ? `Order ${item.orderReference}`
+                            : "Order number not found — review sale"}
+                        </small>
+                        {item.notes && (
+                          <small className="shipping-task-notes">
+                            {item.notes}
                           </small>
-                          {item.notes && (
-                            <small className="shipping-task-notes">
-                              {item.notes}
-                            </small>
+                        )}
+                      </td>
+                      <td>
+                        <DueDate item={item} today={state.today} />
+                      </td>
+                      <td>
+                        <span
+                          className={`badge ${item.paymentStatus === "Paid" ? "delivered" : "processing"}`}
+                          title="Payment status recorded from the email or your edit"
+                        >
+                          {item.paymentStatus}
+                        </span>
+                        {item.paymentStatus !== "Paid" && (
+                          <small className="shipping-review-note">
+                            Confirm payment before shipping
+                          </small>
+                        )}
+                      </td>
+                      <td>
+                        <span className="shipping-source">
+                          {item.source === "ebay-email"
+                            ? "eBay email"
+                            : "Manual task"}
+                        </span>
+                        <small title={item.sourceSubject || undefined}>
+                          {timeLabel(item.received)}
+                        </small>
+                        {item.editedAt && <small>Edited locally</small>}
+                      </td>
+                      <td>
+                        <div className="shipping-row-actions">
+                          {item.status === "Needs Shipment" ? (
+                            <button
+                              className="shipping-complete"
+                              aria-label={`Mark shipped ${item.name}`}
+                              disabled={disabled}
+                              onClick={() => void changeStatus(item, "Shipped")}
+                            >
+                              <CheckCircle2 size={15} />
+                              Mark shipped
+                            </button>
+                          ) : (
+                            <button
+                              className="text-button"
+                              aria-label={`Reopen task ${item.name}`}
+                              disabled={disabled}
+                              onClick={() =>
+                                void changeStatus(item, "Needs Shipment")
+                              }
+                            >
+                              <Undo2 size={15} />
+                              Reopen
+                            </button>
                           )}
-                        </td>
-                        <td>
-                          <DueDate item={item} today={state.today} />
-                        </td>
-                        <td>
-                          <span
-                            className={`badge ${item.paymentStatus === "Paid" ? "delivered" : "processing"}`}
-                            title="Payment status recorded from the email or your edit"
+                          <button
+                            className="text-button"
+                            aria-label={`Edit shipping task ${item.name}`}
+                            disabled={disabled}
+                            onClick={() => {
+                              window.toolbox?.captureEdit?.(item);
+                              setModal({ kind: "edit", item });
+                            }}
                           >
-                            {item.paymentStatus}
-                          </span>
-                          {item.paymentStatus !== "Paid" && (
-                            <small className="shipping-review-note">
-                              Confirm payment before shipping
-                            </small>
-                          )}
-                        </td>
-                        <td>
-                          <span className="shipping-source">
-                            {item.source === "ebay-email"
-                              ? "eBay email"
-                              : "Manual task"}
-                          </span>
-                          <small title={item.sourceSubject || undefined}>
-                            {timeLabel(item.received)}
-                          </small>
-                          {item.editedAt && <small>Edited locally</small>}
-                        </td>
-                        <td>
-                          <div className="shipping-row-actions">
-                            {item.status === "Needs Shipment" ? (
-                              <button
-                                className="shipping-complete"
-                                aria-label={`Mark shipped ${item.name}`}
-                                disabled={disabled}
-                                onClick={() =>
-                                  void changeStatus(item, "Shipped")
-                                }
-                              >
-                                <CheckCircle2 size={15} />
-                                Mark shipped
-                              </button>
-                            ) : (
-                              <button
-                                className="text-button"
-                                aria-label={`Reopen task ${item.name}`}
-                                disabled={disabled}
-                                onClick={() =>
-                                  void changeStatus(item, "Needs Shipment")
-                                }
-                              >
-                                <Undo2 size={15} />
-                                Reopen
-                              </button>
-                            )}
-                            <button
-                              className="text-button"
-                              aria-label={`Edit shipping task ${item.name}`}
-                              disabled={disabled}
-                              onClick={() => {
-                                window.toolbox?.captureEdit?.(item);
-                                setModal({ kind: "edit", item });
-                              }}
-                            >
-                              <Pencil size={15} />
-                            </button>
-                            <button
-                              className="text-button"
-                              aria-label={`Delete shipping task ${item.name}`}
-                              disabled={disabled}
-                              onClick={() => {
-                                window.toolbox?.captureEdit?.(item);
-                                setModal({ kind: "delete", item });
-                              }}
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            className="text-button"
+                            aria-label={`Delete shipping task ${item.name}`}
+                            disabled={disabled}
+                            onClick={() => {
+                              window.toolbox?.captureEdit?.(item);
+                              setModal({ kind: "delete", item });
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -638,23 +634,7 @@ export default function TasksPanel({
             )}
             <div className="table-bottom">
               <span>{matching.length} tasks · Saved on your device</span>
-              <div className="expense-pagination">
-                <button
-                  disabled={current === 1}
-                  onClick={() => setPage(current - 1)}
-                >
-                  Previous
-                </button>
-                <span>
-                  {current} / {pages}
-                </span>
-                <button
-                  disabled={current >= pages}
-                  onClick={() => setPage(current + 1)}
-                >
-                  Next
-                </button>
-              </div>
+              <Pagination value={pagination} label="task" />
             </div>
           </>
         )}

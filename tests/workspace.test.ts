@@ -339,3 +339,39 @@ describe("full mobile workspace", () => {
     }
   });
 });
+
+it("opens a manual collection reference through a validated, read-only phone capability", async () => {
+  const f = await setup();
+  try {
+    f.db.collection.addManual({
+      name: "Linked comic",
+      category: "Comics",
+      collectionType: "comics",
+      quantity: 1,
+      purchaseCents: 100,
+      valueCents: null,
+      referenceUrl: "https://example.org/comic/1",
+      imageData: null,
+    });
+    const id = f.db.collection
+      .items()
+      .find((i) => i.name === "Linked comic")!.id;
+    const result = await f.gateway.execute("phone", {
+      method: "collectibleReferenceUrl",
+      args: [id],
+      requestId: randomUUID(),
+      guards: {},
+    });
+    expect(result.value).toBe("https://example.org/comic/1");
+    await expect(
+      f.gateway.execute("phone", {
+        method: "collectibleReferenceUrl",
+        args: ["https://example.org/unsaved"],
+        requestId: randomUUID(),
+        guards: {},
+      }),
+    ).rejects.toThrow();
+  } finally {
+    f.db.close();
+  }
+});

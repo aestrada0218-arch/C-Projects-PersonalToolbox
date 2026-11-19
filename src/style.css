@@ -2869,3 +2869,14 @@ select:disabled {
 .companion-device strong {
   font-size: 13px;
 }
+
+.collection-breakdown-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 20px 12px;
+}
+.collection-reference {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}

@@ -1,3 +1,4 @@
+import { Pagination, usePagination } from "./pagination";
 import { listenForDataChanges } from "./data-changes";
 import { operationError } from "./operation-error";
 import { OutstandingOrders } from "./MailboxPanels";
@@ -71,15 +72,27 @@ export default function CollectionPanel({
   onSell,
   onChanged,
   productRequest,
+  categoryRequest,
 }: {
   onSell: (id: string) => void;
   onChanged: () => void;
   productRequest: { id: string; nonce: number } | null;
+  categoryRequest?: { category: string; nonce: number } | null;
 }) {
   const [state, setState] = useState(initial);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"all" | "outstanding" | CollectionTab>("all");
   const [filter, setFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(
+    categoryRequest?.category || null,
+  );
+  useEffect(() => {
+    setCategoryFilter(categoryRequest?.category || null);
+    if (categoryRequest) {
+      setTab("all");
+      setFilter("");
+    }
+  }, [categoryRequest]);
   const [query, setQuery] = useState("");
   const [game, setGame] = useState("");
   const [cards, setCards] = useState<CatalogCard[]>([]);
@@ -95,7 +108,6 @@ export default function CollectionPanel({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [modal, setModal] = useState<Modal | null>(null);
-  const [page, setPage] = useState(1);
   const [openProduct, setOpenProduct] = useState<string | null>(null);
   const running = useRef(false);
   const handled = useRef(0);
@@ -247,6 +259,7 @@ export default function CollectionPanel({
   const items = state.items.filter(
     (i) =>
       (tab === "all" || i.collectionType === tab) &&
+      (!categoryFilter || i.category === categoryFilter) &&
       (
         i.name +
         " " +
@@ -261,8 +274,11 @@ export default function CollectionPanel({
         .toLowerCase()
         .includes(filter.toLowerCase()),
   );
-  const lastPage = Math.max(1, Math.ceil(items.length / 25));
-  const current = Math.min(page, lastPage);
+  const pagination = usePagination(
+    items,
+    JSON.stringify([tab, filter, categoryFilter]),
+  );
+  const { setPage } = pagination;
   const known = state.items.filter((i) => i.valueCents !== null);
   const value = known.reduce((n, i) => n + i.valueCents! * i.quantity, 0);
   const cost = state.items.reduce(
@@ -738,6 +754,17 @@ export default function CollectionPanel({
                   known value
                 </span>
               </div>
+              {categoryFilter && (
+                <div className="notice" role="status">
+                  Category: {categoryFilter}
+                  <button
+                    className="text-button"
+                    onClick={() => setCategoryFilter(null)}
+                  >
+                    Clear category filter
+                  </button>
+                </div>
+              )}
               <div className="table-toolbar">
                 <label className="search">
                   <Search size={15} />
@@ -768,198 +795,204 @@ export default function CollectionPanel({
                     </tr>
                   </thead>
                   <tbody>
-                    {items
-                      .slice((current - 1) * 25, current * 25)
-                      .map((item) => (
-                        <tr key={item.id}>
-                          <td>
-                            <div className="collection-owned-name">
-                              {item.imageData ||
-                              (item.provider === "justtcg" &&
-                                item.productId) ? (
-                                <CardArtwork
-                                  localImage={item.imageData}
-                                  productId={
-                                    item.provider === "justtcg"
-                                      ? item.productId
-                                      : null
-                                  }
-                                  name={item.name}
-                                  compact
-                                />
-                              ) : (
-                                <span className="collection-art">
-                                  {item.collectionType === "comics" ? (
-                                    <BookOpen size={25} />
-                                  ) : (
-                                    <Layers size={25} />
-                                  )}
-                                </span>
-                              )}
-                              <div>
-                                <strong>{item.name}</strong>
-                                {item.purchaseDate && (
-                                  <small>Purchased {item.purchaseDate}</small>
+                    {pagination.visible.map((item) => (
+                      <tr key={item.id}>
+                        <td>
+                          <div className="collection-owned-name">
+                            {item.imageData ||
+                            (item.provider === "justtcg" && item.productId) ? (
+                              <CardArtwork
+                                localImage={item.imageData}
+                                productId={
+                                  item.provider === "justtcg"
+                                    ? item.productId
+                                    : null
+                                }
+                                name={item.name}
+                                compact
+                              />
+                            ) : (
+                              <span className="collection-art">
+                                {item.collectionType === "comics" ? (
+                                  <BookOpen size={25} />
+                                ) : (
+                                  <Layers size={25} />
                                 )}
-                                <small>
-                                  {[item.category, item.setName]
-                                    .filter(Boolean)
-                                    .join(" · ")}
-                                </small>
-                                <small>
-                                  {item.provider === "justtcg"
-                                    ? [
-                                        item.printing,
-                                        item.condition,
-                                        item.language,
-                                      ]
-                                        .filter(Boolean)
-                                        .join(" · ")
-                                    : "Manual valuation"}
-                                </small>
-                                {item.referenceUrl &&
-                                  item.provider === "justtcg" && (
-                                    <button
-                                      className="text-button"
-                                      disabled={disabled}
-                                      onClick={() =>
-                                        external(item.referenceUrl!)
-                                      }
-                                    >
-                                      TCGplayer product{" "}
-                                      <ExternalLink size={10} />
-                                    </button>
-                                  )}
-                              </div>
-                            </div>
-                          </td>
-                          <td>{item.quantity}</td>
-                          <td>{money(item.purchaseCents)}</td>
-                          <td className="total">
-                            {item.valueCents === null
-                              ? "Unavailable"
-                              : money(item.valueCents)}
-                            {item.valueCents === null &&
-                              item.lastKnownCents !== null && (
-                                <small>
-                                  Last recorded: {money(item.lastKnownCents)}
-                                </small>
+                              </span>
+                            )}
+                            <div>
+                              <strong>{item.name}</strong>
+                              {item.purchaseDate && (
+                                <small>Purchased {item.purchaseDate}</small>
                               )}
-                          </td>
-                          <td>
-                            <span
-                              className={
-                                "badge " +
-                                (item.error
-                                  ? "processing"
-                                  : item.state === "current"
-                                    ? "delivered"
-                                    : item.state === "manual"
-                                      ? ""
-                                      : "processing")
-                              }
-                            >
-                              {item.error
-                                ? "Refresh failed"
-                                : item.state === "current"
-                                  ? "JustTCG quote"
-                                  : item.state === "manual"
-                                    ? "Manual estimate"
-                                    : item.state === "expired"
-                                      ? "Expired quote"
-                                      : "No current quote"}
-                            </span>
-                            <small>
-                              {item.observedAt
-                                ? "Source: " +
-                                  new Date(item.observedAt).toLocaleString()
-                                : item.provider === "justtcg"
-                                  ? "Source time unavailable"
-                                  : "User-entered value"}
-                            </small>
-                            <small>
-                              {item.checkedAt
-                                ? "Checked: " +
-                                  new Date(item.checkedAt).toLocaleString()
-                                : "Not checked online"}
-                            </small>
-                            {item.error && (
-                              <small className="collection-item-error">
-                                {item.error}
+                              <small>
+                                {[item.category, item.setName]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </small>
+                              <small>
+                                {item.provider === "justtcg"
+                                  ? [
+                                      item.printing,
+                                      item.condition,
+                                      item.language,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" · ")
+                                  : "Manual valuation"}
+                              </small>
+                              {item.referenceUrl && (
+                                <button
+                                  className="text-button collection-reference"
+                                  disabled={disabled}
+                                  aria-label={`Open reference for ${item.name}`}
+                                  title={item.referenceUrl}
+                                  onClick={() =>
+                                    void window
+                                      .toolbox!.openCollectibleReference(
+                                        item.id,
+                                      )
+                                      .catch(() =>
+                                        setError(
+                                          "Could not open this item's reference page.",
+                                        ),
+                                      )
+                                  }
+                                >
+                                  {item.provider === "justtcg"
+                                    ? "TCGplayer product"
+                                    : "Open reference"}{" "}
+                                  <ExternalLink size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td>{item.quantity}</td>
+                        <td>{money(item.purchaseCents)}</td>
+                        <td className="total">
+                          {item.valueCents === null
+                            ? "Unavailable"
+                            : money(item.valueCents)}
+                          {item.valueCents === null &&
+                            item.lastKnownCents !== null && (
+                              <small>
+                                Last recorded: {money(item.lastKnownCents)}
                               </small>
                             )}
-                          </td>
-                          <td>
-                            <div className="collection-row-actions">
-                              <button
-                                aria-label={"Sell item " + item.name}
-                                title="Create a shared eBay / Mercari listing draft"
-                                disabled={disabled}
-                                onClick={() => onSell(item.id)}
-                              >
-                                <Tag size={14} />
-                              </button>
-                              <button
-                                aria-label={"Refresh value " + item.name}
-                                title={
-                                  item.provider === "justtcg"
-                                    ? "Fetch latest available provider quote"
-                                    : "Manual item: edit its estimate"
-                                }
-                                disabled={
-                                  disabled ||
-                                  item.provider !== "justtcg" ||
-                                  !state.settings.connected
-                                }
-                                onClick={() =>
-                                  void action(
-                                    () =>
-                                      window.toolbox!.refreshCollection(
-                                        item.id,
-                                      ),
-                                    "Value refreshed.",
+                        </td>
+                        <td>
+                          <span
+                            className={
+                              "badge " +
+                              (item.error
+                                ? "processing"
+                                : item.state === "current"
+                                  ? "delivered"
+                                  : item.state === "manual"
+                                    ? ""
+                                    : "processing")
+                            }
+                          >
+                            {item.error
+                              ? "Refresh failed"
+                              : item.state === "current"
+                                ? "JustTCG quote"
+                                : item.state === "manual"
+                                  ? "Manual estimate"
+                                  : item.state === "expired"
+                                    ? "Expired quote"
+                                    : "No current quote"}
+                          </span>
+                          <small>
+                            {item.observedAt
+                              ? "Source: " +
+                                new Date(item.observedAt).toLocaleString()
+                              : item.provider === "justtcg"
+                                ? "Source time unavailable"
+                                : "User-entered value"}
+                          </small>
+                          <small>
+                            {item.checkedAt
+                              ? "Checked: " +
+                                new Date(item.checkedAt).toLocaleString()
+                              : "Not checked online"}
+                          </small>
+                          {item.error && (
+                            <small className="collection-item-error">
+                              {item.error}
+                            </small>
+                          )}
+                        </td>
+                        <td>
+                          <div className="collection-row-actions">
+                            <button
+                              aria-label={"Sell item " + item.name}
+                              title="Create a shared eBay / Mercari listing draft"
+                              disabled={disabled}
+                              onClick={() => onSell(item.id)}
+                            >
+                              <Tag size={14} />
+                            </button>
+                            <button
+                              aria-label={"Refresh value " + item.name}
+                              title={
+                                item.provider === "justtcg"
+                                  ? "Fetch latest available provider quote"
+                                  : "Manual item: edit its estimate"
+                              }
+                              disabled={
+                                disabled ||
+                                item.provider !== "justtcg" ||
+                                !state.settings.connected
+                              }
+                              onClick={() =>
+                                void action(
+                                  () =>
+                                    window.toolbox!.refreshCollection(item.id),
+                                  "Value refreshed.",
+                                )
+                              }
+                            >
+                              <RefreshCw size={14} />
+                            </button>
+                            <button
+                              aria-label={"Value history " + item.name}
+                              title="Value history"
+                              disabled={disabled}
+                              onClick={() =>
+                                void window
+                                  .toolbox!.collectionHistory(item.id)
+                                  .then((quotes) =>
+                                    open({ kind: "history", item, quotes }),
                                   )
-                                }
-                              >
-                                <RefreshCw size={14} />
-                              </button>
-                              <button
-                                aria-label={"Value history " + item.name}
-                                title="Value history"
-                                disabled={disabled}
-                                onClick={() =>
-                                  void window
-                                    .toolbox!.collectionHistory(item.id)
-                                    .then((quotes) =>
-                                      open({ kind: "history", item, quotes }),
-                                    )
-                                    .catch(() =>
-                                      setError("Could not load value history."),
-                                    )
-                                }
-                              >
-                                <History size={14} />
-                              </button>
-                              <button
-                                aria-label={"Edit item " + item.name}
-                                title="Edit ownership and photo"
-                                disabled={disabled}
-                                onClick={() => open({ kind: "edit", item })}
-                              >
-                                <Pencil size={14} />
-                              </button>
-                              <button
-                                aria-label={"Delete item " + item.name}
-                                title="Remove from collection"
-                                disabled={disabled}
-                                onClick={() => open({ kind: "delete", item })}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                  .catch(() =>
+                                    setError("Could not load value history."),
+                                  )
+                              }
+                            >
+                              <History size={14} />
+                            </button>
+                            <button
+                              aria-label={"Edit item " + item.name}
+                              title="Edit ownership and photo"
+                              disabled={disabled}
+                              onClick={() => open({ kind: "edit", item })}
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              aria-label={"Delete item " + item.name}
+                              title="Remove from collection"
+                              disabled={disabled}
+                              onClick={() => open({ kind: "delete", item })}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -985,23 +1018,7 @@ export default function CollectionPanel({
                   {items.length} entries · USD · unavailable values excluded
                   from totals
                 </span>
-                <div className="expense-pagination">
-                  <button
-                    disabled={current <= 1}
-                    onClick={() => setPage(current - 1)}
-                  >
-                    Previous
-                  </button>
-                  <span>
-                    {current} / {lastPage}
-                  </span>
-                  <button
-                    disabled={current >= lastPage}
-                    onClick={() => setPage(current + 1)}
-                  >
-                    Next
-                  </button>
-                </div>
+                <Pagination value={pagination} label="collection" />
               </div>
             </section>
           </>

@@ -105,3 +105,16 @@ CREATE TABLE collection_quotes(id TEXT PRIMARY KEY,itemId TEXT NOT NULL REFERENC
 CREATE INDEX collection_quote_item_date ON collection_quotes(itemId,checkedAt);
 CREATE TABLE collection_settings(id INTEGER PRIMARY KEY CHECK(id=1),connected INTEGER NOT NULL DEFAULT 0,gamesJson TEXT NOT NULL DEFAULT '[]',cooldownUntil INTEGER NOT NULL DEFAULT 0,requestTimes TEXT NOT NULL DEFAULT '[]',dailyRemaining INTEGER,monthlyRemaining INTEGER);
 INSERT INTO collection_settings(id) VALUES(1);`;
+
+// Resolve links from saved inventory, never from an untrusted arbitrary IPC URL.
+export function collectibleReference(
+  items: readonly { id: string; referenceUrl: string | null }[],
+  input: unknown,
+) {
+  const id = z.string().uuid().parse(input);
+  const url = referenceUrl.parse(
+    items.find((item) => item.id === id)?.referenceUrl,
+  );
+  if (!url) throw Error("REFERENCE_MISSING");
+  return url;
+}

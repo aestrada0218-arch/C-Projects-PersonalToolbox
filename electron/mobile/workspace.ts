@@ -7,7 +7,10 @@ import {
   exportExpenseCsv,
   type ParsedExpenseCsv,
 } from "../expenses/csv";
-import { allowedTcgNavigation } from "../collection/model";
+import {
+  allowedTcgNavigation,
+  collectibleReference,
+} from "../collection/model";
 import { listingUrl } from "../selling/model";
 export type DesktopAction = (...args: any[]) => unknown;
 type Descriptor = {
@@ -401,6 +404,7 @@ export class WorkspaceGateway {
       "exportExpenseText",
       "exportOrderText",
       "openCollectionUrl",
+      "collectibleReferenceUrl",
       "openListingUrl",
       "copyListingText",
     ];
@@ -416,6 +420,7 @@ export class WorkspaceGateway {
         "exportExpenseText",
         "exportOrderText",
         "openCollectionUrl",
+        "collectibleReferenceUrl",
         "openListingUrl",
         "copyListingText",
       ].includes(method);
@@ -541,6 +546,8 @@ export class WorkspaceGateway {
             .snapshot()
             .orders.map((o) => keys.map((k) => cell(o[k])).join(",")),
         ].join("\r\n");
+      } else if (method === "collectibleReferenceUrl") {
+        value = collectibleReference(this.store.collection.items(), args[0]);
       } else if (method === "openCollectionUrl") {
         const url = z.string().max(2048).parse(args[0]);
         if (

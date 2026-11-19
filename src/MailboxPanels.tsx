@@ -1,3 +1,4 @@
+import { Pagination, usePagination } from "./pagination";
 import { listenForDataChanges } from "./data-changes";
 import { operationError } from "./operation-error";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -479,6 +480,10 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
+  const pagination = usePagination(
+    items,
+    JSON.stringify([query, showReceived]),
+  );
   const selectedIds = items.filter((l) => checked.has(l.id)).map((l) => l.id);
   useEffect(() => {
     if (selectAll.current)
@@ -635,7 +640,7 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
             </tr>
           </thead>
           <tbody>
-            {items.map((l) => (
+            {pagination.visible.map((l) => (
               <tr
                 key={l.id}
                 className={
@@ -749,6 +754,9 @@ export function OutstandingOrders({ onReceived }: { onReceived: () => void }) {
           </p>
         </div>
       )}
+      <div className="table-bottom">
+        <Pagination value={pagination} label="outstanding" />
+      </div>
       {selected && (
         <Dialog
           title="Receive items into collection"

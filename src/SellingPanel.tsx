@@ -1,3 +1,4 @@
+import { Pagination, usePagination } from "./pagination";
 import { listenForDataChanges } from "./data-changes";
 import { operationError } from "./operation-error";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -92,8 +93,7 @@ export default function SellingPanel({
     [notice, setNotice] = useState("");
   const [modal, setModal] = useState<Modal | null>(null),
     [filter, setFilter] = useState("All pairs"),
-    [query, setQuery] = useState(""),
-    [page, setPage] = useState(1);
+    [query, setQuery] = useState("");
   const running = useRef(false),
     revision = useRef(0),
     handled = useRef(0);
@@ -213,8 +213,8 @@ export default function SellingPanel({
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
-  const pages = Math.max(1, Math.ceil(matching.length / 20)),
-    current = Math.min(page, pages);
+  const pagination = usePagination(matching, JSON.stringify([filter, query]));
+  const { setPage } = pagination;
   if (loading)
     return <div className="panel loading">Loading your listing workspace…</div>;
   return (
@@ -481,7 +481,7 @@ export default function SellingPanel({
           </div>
         ) : (
           <div className="selling-grid">
-            {matching.slice((current - 1) * 20, current * 20).map((unit) => {
+            {pagination.visible.map((unit) => {
               const editable =
                   !unit.soldOn &&
                   ["draft", "prepared"].includes(unit.ebayState),
@@ -817,23 +817,7 @@ export default function SellingPanel({
             Copies stay allocated after sale. Collection quantities and
             financial totals are not changed automatically.
           </span>
-          <div className="expense-pagination">
-            <button
-              disabled={current === 1}
-              onClick={() => setPage(current - 1)}
-            >
-              Previous
-            </button>
-            <span>
-              {current} / {pages}
-            </span>
-            <button
-              disabled={current >= pages}
-              onClick={() => setPage(current + 1)}
-            >
-              Next
-            </button>
-          </div>
+          <Pagination value={pagination} label="selling" />
         </div>
       </section>
       {modal && (

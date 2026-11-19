@@ -4,7 +4,7 @@ import { readFile, stat } from "node:fs/promises";
 import type { CollectionService } from "./service";
 import type { CollectionRepository } from "./store";
 import type { TcgCatalogBrowser } from "./browser";
-import { allowedTcgNavigation } from "./model";
+import { allowedTcgNavigation, collectibleReference } from "./model";
 export function registerCollectionHandlers(
   service: CollectionService,
   repo: CollectionRepository,
@@ -12,6 +12,10 @@ export function registerCollectionHandlers(
   window: () => BrowserWindow,
   handle: (channel: string, fn: (...args: any[]) => unknown) => void,
 ) {
+  handle("toolbox:collection-reference", async (id) => {
+    await shell.openExternal(collectibleReference(repo.items(), id));
+    return true;
+  });
   handle("toolbox:collection-state", () => service.state());
   handle("toolbox:collection-connect", (input) => service.connect(input));
   handle("toolbox:collection-disconnect", () => service.disconnect());

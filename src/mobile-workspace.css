@@ -134,7 +134,7 @@
   margin-bottom: 15px;
 }
 .mobile-workspace .collection-chart {
-  display: none;
+  display: block;
 }
 .mobile-workspace .table-toolbar {
   flex-wrap: wrap;

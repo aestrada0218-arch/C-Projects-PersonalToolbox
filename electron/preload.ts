@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld(
       ipcRenderer.on("toolbox:data-changed", listener);
       return () => ipcRenderer.removeListener("toolbox:data-changed", listener);
     },
+    openCollectibleReference: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:collection-reference", id),
     updateOrder: (input: unknown) =>
       ipcRenderer.invoke("toolbox:update-order", input),
     companionStatus: () => ipcRenderer.invoke("toolbox:companion-status"),

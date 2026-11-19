@@ -106,6 +106,7 @@ export function createMobileWorkspaceApi(
     "exportExpenseText",
     "exportOrderText",
     "openCollectionUrl",
+    "collectibleReferenceUrl",
     "openListingUrl",
     "copyListingText",
   ]);
@@ -421,6 +422,8 @@ export function createMobileWorkspaceApi(
     download("personal-toolbox-orders.csv", await rpc("exportOrderText"));
     return true;
   };
+  api.openCollectibleReference = async (id: string) =>
+    open(await rpc("collectibleReferenceUrl", [id]));
   api.openCollectionProvider = async (url: string) =>
     open(await rpc("openCollectionUrl", [url]));
   api.openSellingListing = async (input: unknown) =>

@@ -65,6 +65,7 @@ export interface ToolboxAPI {
   readonly mobileMode?: boolean;
   onDataChanged?(callback: () => void): () => void;
   captureEdit?(value: unknown): void;
+  openCollectibleReference(id: string): Promise<boolean>;
   updateOrder(input: { id: string; item: NewOrder }): Promise<Snapshot>;
   companionStatus(): Promise<CompanionStatus>;
   startCompanion(input: { url: string }): Promise<CompanionResult>;

@@ -1,3 +1,4 @@
+import { Pagination, usePagination } from "./pagination";
 import { listenForDataChanges } from "./data-changes";
 import { MailboxManager } from "./MailboxPanels";
 import { useEffect, useState } from "react";
@@ -96,6 +97,8 @@ export default function InboxPanel({
       .toLowerCase()
       .includes(query.toLowerCase()),
   );
+  const updatePagination = usePagination(updates, query);
+  const shipmentPagination = usePagination(shipments, query);
   if (loading)
     return <div className="panel loading">Loading your shipment inbox…</div>;
   return (
@@ -322,7 +325,7 @@ export default function InboxPanel({
           </div>
         ) : (
           <div>
-            {updates.map((update) => (
+            {updatePagination.visible.map((update) => (
               <EmailUpdateRow
                 key={update.id}
                 update={update}
@@ -343,6 +346,9 @@ export default function InboxPanel({
             ))}
           </div>
         )}
+        <div className="table-bottom">
+          <Pagination value={updatePagination} label="email update" />
+        </div>
       </section>
       <section className="panel">
         <div className="panel-heading">
@@ -373,7 +379,7 @@ export default function InboxPanel({
           </div>
         ) : (
           <div className="shipment-list">
-            {shipments.map((s) => (
+            {shipmentPagination.visible.map((s) => (
               <ShipmentRow
                 key={s.id}
                 shipment={s}
@@ -394,6 +400,9 @@ export default function InboxPanel({
             ))}
           </div>
         )}
+        <div className="table-bottom">
+          <Pagination value={shipmentPagination} label="shipment" />
+        </div>
         <div className="table-bottom">
           Email updates are estimates, not live carrier confirmations. Remote
           images, links, email HTML, and attachments are never displayed.
