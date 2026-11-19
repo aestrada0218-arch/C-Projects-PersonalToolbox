@@ -1,3 +1,5 @@
+import { Ship24Repository } from "./ship24/store";
+import { ship24Migration } from "./ship24/model";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { OrganizerRepository } from "./organizer/store";
 import { organizerMigration, schemas } from "./organizer/model";
@@ -68,6 +70,11 @@ export class Store {
       fn,
     );
   }
+  readonly ship24 = new Ship24Repository(
+    () => this.db,
+    (fn) => this.mutate(fn),
+    () => this,
+  );
   readonly organizer = new OrganizerRepository(
     () => this.db,
     (fn) => this.mutate(fn),
@@ -91,7 +98,7 @@ export class Store {
         if (
           !Number.isInteger(v) ||
           v < 1 ||
-          v > 12 ||
+          v > 13 ||
           !db.exec(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='orders'",
           ).length
@@ -165,6 +172,11 @@ export class Store {
                 "This file does not contain a complete Toolbox database.",
               );
           }
+        if (v >= 13) {
+          for (const table of ["ship24_settings", "ship24_trackers"])
+            if (!db.exec(`PRAGMA table_info(${table})`).length)
+              throw Error("Incomplete Ship24 backup.");
+        }
         if (v >= 12) {
           const rows =
             db.exec("SELECT kind,data FROM organizer_records")[0]?.values || [];
@@ -246,7 +258,7 @@ export class Store {
     const version =
       this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
     // v0.7 only added separate entry tables; retain them when rolling back.
-    if (Number(version) > 12) throw new Error("Unsupported database version");
+    if (Number(version) > 13) throw new Error("Unsupported database version");
     if (Number(version) < 1) {
       this.db.run(
         `BEGIN; CREATE TABLE orders(id TEXT PRIMARY KEY,name TEXT NOT NULL,store TEXT NOT NULL,category TEXT NOT NULL,total REAL NOT NULL CHECK(total>=0),status TEXT NOT NULL CHECK(status IN ('Delivered','In transit','Processing','Cancelled')),date TEXT NOT NULL); CREATE TABLE collection(id TEXT PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),purchase REAL NOT NULL,market REAL NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO migrations VALUES(1);`,
@@ -417,6 +429,23 @@ export class Store {
         "BEGIN;" +
           organizerMigration +
           "INSERT INTO migrations VALUES(12);COMMIT;",
+      );
+      this.persist();
+    }
+    if (Number(version) < 13) {
+      if (
+        this.path &&
+        Number(version) > 0 &&
+        !existsSync(this.path + ".pre-ship24-v12.bak")
+      )
+        writeFileSync(this.path + ".pre-ship24-v12.bak", this.db.export(), {
+          mode: 0o600,
+          flag: "wx",
+        });
+      this.db.run(
+        "BEGIN;" +
+          ship24Migration +
+          "INSERT INTO migrations VALUES(13);COMMIT;",
       );
       this.persist();
     }

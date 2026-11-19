@@ -1,3 +1,5 @@
+import { Ship24Service } from "./ship24/service";
+import { Ship24Provider } from "./ship24/provider";
 import { carrierLink } from "./organizer/model";
 import { BackupManager } from "./organizer/backups";
 import { FileCompanionPreferences } from "./mobile/preferences";
@@ -32,6 +34,7 @@ let inbox: InboxService;
 let mailboxes: MailboxService;
 let store: Store;
 let companion: CompanionServer;
+let ship24: Ship24Service;
 let backups: BackupManager;
 let backupError: string | undefined;
 let restoreError: string | undefined;
@@ -141,6 +144,33 @@ else {
       };
       dailyBackup();
       backupTimer = setInterval(dailyBackup, 3600000);
+      ship24 = new Ship24Service(
+        store.ship24,
+        new WindowsCredentialVault("PersonalToolbox/Ship24/v1"),
+        new Ship24Provider((url, init) =>
+          net.fetch(url instanceof URL ? url.toString() : url, init),
+        ),
+      );
+      await ship24.initialize();
+      ship24.start();
+      handle("toolbox:ship24-state", () => ship24.state());
+      handle("toolbox:ship24-connect", (input) => ship24.connect(input));
+      handle("toolbox:ship24-disconnect", () => ship24.disconnect());
+      handle("toolbox:ship24-preferences", (input) =>
+        ship24.preferences(input),
+      );
+      handle("toolbox:ship24-register", (input) => ship24.register(input));
+      handle("toolbox:ship24-recover", (id) => ship24.recover(id));
+      handle("toolbox:ship24-site", async (input) => {
+        const page = z.enum(["dashboard", "setup"]).parse(input);
+        await shell.openExternal(
+          page === "dashboard"
+            ? "https://dashboard.ship24.com"
+            : "https://docs.ship24.com/getting-started",
+        );
+        return true;
+      });
+      handle("toolbox:ship24-refresh", (id) => ship24.refresh(id));
       const organizerState = () => ({
         ...store.organizer.state(),
         backups: backups.list(),
@@ -480,6 +510,7 @@ else {
     if (process.platform !== "darwin") app.quit();
   });
   app.on("before-quit", () => {
+    ship24?.stop();
     clearInterval(backupTimer);
     unsubscribeDataChanges?.();
     clearTimeout(dataChangeTimer);

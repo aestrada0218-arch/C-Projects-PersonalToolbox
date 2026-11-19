@@ -1,4 +1,4 @@
-# Personal Toolbox · v0.12.0
+# Personal Toolbox · v0.13.0
 
 A Windows desktop app built with Electron, React, TypeScript, Vite, Tailwind CSS, SQLite (sql.js), Recharts, and Playwright. Original dark-and-gold interface. Version 0.6 adds direct eBay fixed-price selling, shared drafts, exact Mercari listing links, and persistent cross-listing follow-ups. Version 0.5 added eBay-email shipping tasks with ship-by dates and scheduled Gmail checks. Version 0.4.1 added illustrated card search and full-title matching. Version 0.4 added a multi-section collection, JustTCG catalog/pricing, saved quote history, and an isolated interactive TCGplayer catalog browser. The categorized expense ledger and recurring bookkeeping remain available.
 
@@ -23,6 +23,25 @@ node scripts/repair-electron.cjs
 ```
 
 To update an existing installation, close the app, download the latest source ZIP, and copy the extracted source folder's contents into your existing project folder, choosing Replace. Keep your existing `node_modules` folder so its repaired Electron binary remains installed. Run `npm install` to add new dependencies, then `npm run dev`. The local database is stored separately in AppData.
+
+## Ship24 carrier updates (v0.13)
+
+Open **Organizer → Tracking** or **Inbox → Ship24 tracking**. Create a Ship24 account with a **Tracking API and Webhook per-shipment plan**, then paste its API key into **Ship24 API key → Connect Ship24 securely**. A dashboard-only subscription is not the same product. Check current allowances in [Ship24’s pricing guide](https://help.ship24.com/en/article/ship24-pricing-and-plans-explained-425d9d/) and follow its [API setup instructions](https://docs.ship24.com/getting-started). Toolbox does not sign up, buy credits, or upgrade plans for you.
+
+1. Add a tracking number to an Organizer package, or let an Inbox scan find it.
+2. Choose **Track with Ship24**, review the number, and confirm registration. Optional country, postal code, and shipping date must describe the actual parcel. Registering can consume your plan’s shipment allowance. Exact matching registration details share a tracker.
+3. Use **Refresh** for current carrier results, estimated/delivered dates and **Timeline** for events. Initial carrier results can take a few minutes. Refresh reads the existing tracker; it does not create another tracker. Manual refresh has a 30-second minimum interval per tracker.
+4. Optionally enable background refresh, approximately every 30 minutes while the Windows app is open. Only registered active trackers are checked, at most 20 per cycle. Delivered shipments stop polling. Newly discovered Inbox numbers are never automatically registered.
+
+The default local cap is **10 attempted new registrations per UTC calendar month**. This is a local safeguard, not Ship24’s remaining account quota or billing cycle; other apps and restored backups can affect actual usage. Failed or ambiguous registration attempts count conservatively. Review the provider dashboard before increasing this cap. Provider rate limits and Retry-After cooldowns are honored. Network failures keep the last good results.
+
+If registration times out, use **Recover registration**. Toolbox looks up the stable client ID and never automatically repeats an uncertain registration POST. If recovery cannot find it, review the Ship24 dashboard before taking further action. An archived/unsubscribed provider tracker is not silently recreated. Tracking numbers, carrier or purchase-date changes invalidate the old link; review and register the current parcel details. Carrier numbers can be reused, so provide known shipment details where available.
+
+Carrier results are a separate read-only overlay on Organizer packages; manually entered status, dates, notes and receiving quantities remain editable and intact. Conflicting tracker identities and delivery dates before the known purchase/shipping date are rejected. Multiple linked shipments must all report delivered before the package is displayed as delivered. Event timestamps are displayed as supplied by the provider. Unsupported numbers remain editable in the source record.
+
+The API key stays in **Windows Credential Manager** and the Electron main process. It is not returned by state APIs, saved in SQLite/backups, put in URLs, or logged. Reconnect credentials separately after moving databases to another PC. Disconnect stops local refresh and removes the saved key, but does not unsubscribe trackers in Ship24 or change its billing. Deleting local package data likewise does not cancel remote trackers. Manage subscriptions in Ship24’s dashboard.
+
+The paired iPhone companion exposes the same tracking controls over the existing private HTTPS connection. Keep the PC app and Tailscale running; no public webhooks, Funnel configuration or new port is required. The upgrade preserves pairing, saved URLs, existing records, and creates a pre-migration backup named `personal-toolbox.sqlite.pre-ship24-v12.bak` before schema 13. Provider registrations are external actions and cannot be undone through local record history.
 
 ## Collection: TCGplayer browsing and JustTCG pricing
 

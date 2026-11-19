@@ -2,6 +2,20 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "toolbox",
   Object.freeze({
+    recoverShip24: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:ship24-recover", id),
+    openShip24Site: (page: unknown) =>
+      ipcRenderer.invoke("toolbox:ship24-site", page),
+    ship24State: () => ipcRenderer.invoke("toolbox:ship24-state"),
+    connectShip24: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:ship24-connect", input),
+    disconnectShip24: () => ipcRenderer.invoke("toolbox:ship24-disconnect"),
+    setShip24Preferences: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:ship24-preferences", input),
+    registerShip24: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:ship24-register", input),
+    refreshShip24: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:ship24-refresh", id),
     openPackageTracking: (id: unknown) =>
       ipcRenderer.invoke("toolbox:organizer-track", id),
     organizerAlerts: () => ipcRenderer.invoke("toolbox:organizer-alerts"),

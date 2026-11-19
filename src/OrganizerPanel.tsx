@@ -1,3 +1,4 @@
+import Ship24Panel from "./Ship24Panel";
 import { useEffect, useRef, useState } from "react";
 import type {
   OrganizerKind,
@@ -220,7 +221,7 @@ export default function OrganizerPanel({
     if (r.kind === "receipt")
       return `${r.data.quantity} received · ${r.data.date} · ${state.records.find((l) => l.id === r.data.lineId)?.data.description || "Deleted order line"}`;
     if (r.kind === "package")
-      return `${r.data.status} · ${r.data.carrier} ${r.data.tracking} · expected ${r.data.expectedDate || "not set"} · actual ${r.data.actualDate || "not set"}`;
+      return `${r.ship24?.summary.status || r.data.status}${r.ship24 ? " (Ship24)" : " (manual)"} · ${r.data.carrier} ${r.data.tracking} · expected ${r.ship24?.summary.estimatedDate || r.data.expectedDate || "not set"} · actual ${r.ship24?.summary.actualDate || r.data.actualDate || "not set"}`;
     if (r.kind === "return")
       return `${r.data.status} · received ${money(r.data.refundedCents)} / ${money(r.data.expectedCents)} · deadline ${r.data.deadline || "not set"}`;
     if (r.kind === "sale")
@@ -278,6 +279,7 @@ export default function OrganizerPanel({
           </button>
         ))}
       </div>
+      {section === "Tracking" && <Ship24Panel />}
       {error && (
         <div className="alert" role="alert">
           {error}

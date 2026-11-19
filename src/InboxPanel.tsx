@@ -1,3 +1,4 @@
+import Ship24Panel from "./Ship24Panel";
 import { operationError } from "./operation-error";
 import { Pagination, usePagination } from "./pagination";
 import { listenForDataChanges } from "./data-changes";
@@ -289,6 +290,7 @@ export default function InboxPanel({
         )}
       </section>
       <MailboxManager />
+      {typeof window.toolbox?.ship24State === "function" && <Ship24Panel />}
       <section className="panel inbox-help">
         <h3>Set up Gmail in three steps</h3>
         <ol>

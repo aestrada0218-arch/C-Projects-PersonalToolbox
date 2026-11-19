@@ -1,3 +1,4 @@
+import type { TrackingSummary } from "./ship24-types";
 import type { Order } from "./types";
 import type { OwnedCollectible } from "./collection-types";
 export const organizerKinds = [
@@ -20,6 +21,7 @@ export type OrganizerRecord = {
   revision: number;
   createdAt: string;
   updatedAt: string;
+  ship24?: { summary: TrackingSummary; checkedAt: string | null };
 };
 export type HistoryEntry = {
   id: string;

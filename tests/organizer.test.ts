@@ -346,7 +346,7 @@ it("migrates schema 11 with a backup and rolls back record/history together on a
     });
     const raw = new SQL.Database(readFileSync(file));
     raw.run(
-      "DROP TABLE organizer_records; DROP TABLE toolbox_history; DELETE FROM migrations WHERE version=12;",
+      "DROP TABLE ship24_trackers; DROP TABLE ship24_settings; DROP TABLE organizer_records; DROP TABLE toolbox_history; DELETE FROM migrations WHERE version>=12;",
     );
     writeFileSync(file, raw.export());
     raw.close();

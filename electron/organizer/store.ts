@@ -268,6 +268,15 @@ export class OrganizerRepository {
       records = this.records(),
       s = this.store(),
       snapshot = s.snapshot();
+    const trackingSources = s.ship24.sources();
+    for (const r of records.filter((r) => r.kind === "package")) {
+      const source = trackingSources.find(
+          (c) => c.type === "package" && c.id === r.id,
+        ),
+        binding = source ? s.ship24.effective(source) : null;
+      if (binding?.summary)
+        r.ship24 = { summary: binding.summary, checkedAt: binding.checkedAt };
+    }
     const reminders: OrganizerState["reminders"] = [];
     const add = (
       id: string,
@@ -281,11 +290,14 @@ export class OrganizerRepository {
     for (const r of records) {
       if (r.kind === "reminder" && !r.data.completed)
         add(r.id, r.data.title, r.data.date, "Reminders");
-      if (r.kind === "package" && r.data.status !== "Delivered")
+      if (
+        r.kind === "package" &&
+        (r.ship24?.summary.status || r.data.status) !== "Delivered"
+      )
         add(
           r.id,
-          `${r.data.status === "Exception" ? "Delivery exception: " : "Expected package: "}${r.data.tracking || r.data.carrier}`,
-          r.data.expectedDate,
+          `${(r.ship24?.summary.status || r.data.status) === "Exception" ? "Delivery exception: " : "Expected package: "}${r.data.tracking || r.data.carrier}`,
+          r.ship24?.summary.estimatedDate || r.data.expectedDate,
           "Packages",
         );
       if (

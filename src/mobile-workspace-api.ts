@@ -94,6 +94,7 @@ export function createMobileWorkspaceApi(
   };
   const reads = new Set([
     "organizerAlerts",
+    "ship24State",
     "organizerState",
     "snapshot",
     "collectionState",
@@ -169,6 +170,8 @@ export function createMobileWorkspaceApi(
     if (
       !reads.has(method) &&
       ![
+        "recoverShip24",
+        "connectShip24",
         "connectMailbox",
         "connectGmail",
         "connectEbay",
@@ -231,11 +234,18 @@ export function createMobileWorkspaceApi(
     }
   }
   const methods = [
+    "recoverShip24",
+    "connectShip24",
+    "disconnectShip24",
+    "setShip24Preferences",
+    "registerShip24",
+    "refreshShip24",
     "saveOrganizer",
     "deleteOrganizer",
     "undoOrganizer",
     "createBackup",
     "organizerAlerts",
+    "ship24State",
     "organizerState",
     "snapshot",
     "addOrder",
@@ -431,6 +441,15 @@ export function createMobileWorkspaceApi(
   api.exportOrders = async () => {
     download("personal-toolbox-orders.csv", await rpc("exportOrderText"));
     return true;
+  };
+  api.openShip24Site = async (page: string) => {
+    if (!["dashboard", "setup"].includes(page))
+      throw Error("Unknown Ship24 page");
+    return open(
+      page === "dashboard"
+        ? "https://dashboard.ship24.com"
+        : "https://docs.ship24.com/getting-started",
+    );
   };
   api.openPackageTracking = async (id: string) =>
     open(await rpc("packageTrackingUrl", [id]));

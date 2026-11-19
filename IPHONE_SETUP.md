@@ -1,12 +1,13 @@
 # Add Personal Toolbox to your iPhone
 
-This is a private mobile web companion. No App Store account or Mac is needed. Your existing Windows app remains the source of truth and must stay open on an awake PC. Version 0.12 opens the **full toolbox** by default after pairing, using the same editors and validation as Windows:
+This is a private mobile web companion. No App Store account or Mac is needed. Your existing Windows app remains the source of truth and must stay open on an awake PC. Version 0.13 opens the **full toolbox** by default after pairing, using the same editors and validation as Windows:
 
 - Orders: add, edit, search, delete and export CSV.
 - Collection: search cards, add items, edit quantities/prices/sections, attach photos, delete items and refresh values.
 - Outstanding orders: scan connected mailboxes, receive items, set expected-arrival dates and select/delete multiple lines.
 - Expenses: add/edit/delete charges, manage recurring schedules and import/export CSV with preview.
 - Tasks: add/edit/delete shipment tasks and update their status.
+- Ship24: connect the Tracking API per-shipment plan, confirm individual tracker registration, refresh carrier results, view timelines and opt into 30-minute polling while Windows is open. Setup is in **Organizer → Tracking** and **Inbox**. See [Ship24 setup](README.md#ship24-carrier-updates-v013).
 - Inbox: connect and manage Gmail/IMAP inboxes, run supported checks and delete untracked email updates after confirmation. Deletion removes the Toolbox record only and prevents re-import of the same update.
 - Selling: manage drafts, add photos and use the existing eBay and assisted Mercari controls, including the same publish confirmations.
 

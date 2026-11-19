@@ -34,6 +34,18 @@ export async function createWorkspaceFixture(file?: string) {
       busy: false,
       progress: "",
     });
+  actions.set("toolbox:ship24-state", () => ({
+    connected: false,
+    supported: false,
+    busy: false,
+    autoEnabled: false,
+    monthlyCap: 10,
+    usedThisMonth: 0,
+    month: "2026-11",
+    cooldownUntil: 0,
+    sources: [],
+    trackers: [],
+  }));
   actions.set("toolbox:snapshot", () => db.snapshot());
   actions.set("toolbox:add-order", (v) => db.addOrder(v));
   actions.set("toolbox:update-order", (v) => db.updateOrder(v));

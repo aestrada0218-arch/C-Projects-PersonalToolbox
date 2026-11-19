@@ -132,3 +132,41 @@
   padding: 3px 5px;
   white-space: nowrap;
 }
+.ship24-panel {
+  margin: 20px 0;
+}
+.ship24-panel form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 14px 0;
+}
+.ship24-panel label {
+  font-size: 12px;
+  color: #b2b8c5;
+}
+.ship24-panel input:not([type="checkbox"]) {
+  display: block;
+  background: #101217;
+  border: 1px solid #363b45;
+  border-radius: 6px;
+  color: #dce1e9;
+  padding: 9px;
+  margin-top: 7px;
+  max-width: 100%;
+}
+.ship24-panel input[type="password"] {
+  min-width: 260px;
+}
+.ship24-panel .organizer-list p {
+  font-size: 12px;
+  color: #9da5b4;
+  line-height: 1.7;
+}
+.ship24-panel a {
+  color: #d6b56b;
+}
+.ship24-panel button {
+  min-height: 38px;
+}

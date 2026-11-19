@@ -1,4 +1,9 @@
 import type {
+  Ship24State,
+  Ship24Result,
+  Ship24Registration,
+} from "./ship24-types";
+import type {
   OrganizerState,
   OrganizerResult,
   OrganizerKind,
@@ -90,6 +95,17 @@ export interface ToolboxAPI {
   restoreBackup(id: string): Promise<boolean>;
   exportBackup(id: string): Promise<boolean>;
   importBackup(): Promise<OrganizerResult>;
+  recoverShip24(id: string): Promise<Ship24Result>;
+  openShip24Site(page: "dashboard" | "setup"): Promise<boolean>;
+  ship24State(): Promise<Ship24State>;
+  connectShip24(input: { apiKey: string }): Promise<Ship24Result>;
+  disconnectShip24(): Promise<Ship24Result>;
+  setShip24Preferences(input: {
+    autoEnabled: boolean;
+    monthlyCap: number;
+  }): Promise<Ship24Result>;
+  registerShip24(input: Ship24Registration): Promise<Ship24Result>;
+  refreshShip24(id: string): Promise<Ship24Result>;
   readonly mobileMode?: boolean;
   onDataChanged?(callback: () => void): () => void;
   captureEdit?(value: unknown): void;

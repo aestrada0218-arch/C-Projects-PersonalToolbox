@@ -135,6 +135,7 @@ export const kindLabels: Record<OrganizerKind, string> = {
 };
 export const sections = {
   Overview: [],
+  Tracking: [],
   Orders: ["line", "receipt", "package", "return"],
   Collection: ["details", "attachment"],
   Wishlist: ["wishlist"],

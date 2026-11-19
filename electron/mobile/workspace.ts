@@ -23,6 +23,23 @@ type Descriptor = {
 };
 // This is a fixed capability list, not a general Electron IPC bridge.
 export const workspaceMethods: Record<string, Descriptor> = {
+  recoverShip24: { channel: "toolbox:ship24-recover", state: "ship24State" },
+  ship24State: {
+    channel: "toolbox:ship24-state",
+    read: true,
+    state: "ship24State",
+  },
+  connectShip24: { channel: "toolbox:ship24-connect", state: "ship24State" },
+  disconnectShip24: {
+    channel: "toolbox:ship24-disconnect",
+    state: "ship24State",
+  },
+  setShip24Preferences: {
+    channel: "toolbox:ship24-preferences",
+    state: "ship24State",
+  },
+  registerShip24: { channel: "toolbox:ship24-register", state: "ship24State" },
+  refreshShip24: { channel: "toolbox:ship24-refresh", state: "ship24State" },
   organizerAlerts: { channel: "toolbox:organizer-alerts", read: true },
   organizerState: {
     channel: "toolbox:organizer-state",
@@ -280,6 +297,7 @@ export const workspaceMethods: Record<string, Descriptor> = {
 const digest = (v: unknown) =>
   createHash("sha256").update(JSON.stringify(v)).digest("hex");
 const stateChannels: Record<string, string> = {
+  ship24State: "toolbox:ship24-state",
   organizerState: "toolbox:organizer-state",
   snapshot: "toolbox:snapshot",
   collectionState: "toolbox:collection-state",
