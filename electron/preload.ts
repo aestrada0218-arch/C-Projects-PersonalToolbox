@@ -2,6 +2,22 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "toolbox",
   Object.freeze({
+    openPackageTracking: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:organizer-track", id),
+    organizerAlerts: () => ipcRenderer.invoke("toolbox:organizer-alerts"),
+    organizerState: () => ipcRenderer.invoke("toolbox:organizer-state"),
+    saveOrganizer: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:organizer-save", input),
+    deleteOrganizer: (input: unknown) =>
+      ipcRenderer.invoke("toolbox:organizer-delete", input),
+    undoOrganizer: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:organizer-undo", id),
+    createBackup: () => ipcRenderer.invoke("toolbox:backup-create"),
+    restoreBackup: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:backup-restore", id),
+    exportBackup: (id: unknown) =>
+      ipcRenderer.invoke("toolbox:backup-export", id),
+    importBackup: () => ipcRenderer.invoke("toolbox:backup-import"),
     onDataChanged: (callback: () => void) => {
       if (typeof callback !== "function")
         throw new TypeError("Callback required");

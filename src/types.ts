@@ -1,3 +1,8 @@
+import type {
+  OrganizerState,
+  OrganizerResult,
+  OrganizerKind,
+} from "./organizer-types";
 import type { CompanionStatus, CompanionResult } from "./mobile-types";
 import type {
   MailboxState,
@@ -62,6 +67,29 @@ export type Snapshot = {
 };
 export type NewOrder = Omit<Order, "id">;
 export interface ToolboxAPI {
+  openPackageTracking(id: string): Promise<boolean>;
+  organizerAlerts?(): Promise<{
+    overdue: number;
+    dueSoon: number;
+    duplicates: number;
+    backupError?: string;
+  }>;
+  organizerState(): Promise<OrganizerState>;
+  saveOrganizer(input: {
+    id: string | null;
+    revision: number | null;
+    kind: OrganizerKind;
+    data: unknown;
+  }): Promise<OrganizerResult>;
+  deleteOrganizer(input: {
+    id: string;
+    revision: number;
+  }): Promise<OrganizerResult>;
+  undoOrganizer(id: string): Promise<OrganizerResult>;
+  createBackup(): Promise<OrganizerResult>;
+  restoreBackup(id: string): Promise<boolean>;
+  exportBackup(id: string): Promise<boolean>;
+  importBackup(): Promise<OrganizerResult>;
   readonly mobileMode?: boolean;
   onDataChanged?(callback: () => void): () => void;
   captureEdit?(value: unknown): void;

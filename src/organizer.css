@@ -1,0 +1,134 @@
+.organizer-module .collection-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 7px;
+  margin: 20px 0;
+  white-space: nowrap;
+}
+.organizer-module .collection-tabs button {
+  padding: 10px 14px;
+  flex-shrink: 0;
+  border-radius: 7px;
+}
+.organizer-module .collection-tabs button[aria-selected="true"] {
+  background: #d6b56b20;
+  color: #dfbf79;
+  border-bottom: 2px solid #d6b56b;
+}
+.organizer-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.organizer-stats article {
+  padding: 20px;
+}
+.organizer-stats strong {
+  font-size: 24px;
+  display: block;
+  margin-top: 10px;
+}
+.organizer-list {
+  padding: 20px;
+  margin: 16px 0;
+}
+.organizer-list h2 {
+  font-size: 17px;
+  margin-bottom: 12px;
+}
+.organizer-list > p,
+.organizer-note {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #9da5b4;
+  margin-bottom: 14px;
+}
+.organizer-note {
+  padding: 16px;
+}
+.organizer-list > div:not(.actions):not(.pagination-controls),
+.organizer-record {
+  padding: 14px 0;
+  border-bottom: 1px solid #30343d;
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  align-items: flex-start;
+}
+.organizer-record {
+  width: 100%;
+}
+.organizer-record > div:first-child {
+  min-width: 0;
+}
+.organizer-record p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #9da5b4;
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.organizer-record .actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.organizer-warning {
+  color: #e5b467;
+}
+.organizer-photo {
+  max-height: 180px;
+  max-width: 150px;
+  border-radius: 8px;
+  margin-top: 12px;
+  object-fit: contain;
+}
+.organizer-dialog {
+  width: 650px;
+  max-height: 90dvh;
+  overflow: auto;
+}
+.organizer-dialog textarea {
+  width: 100%;
+  min-height: 80px;
+  background: #101217;
+  color: #dce1e9;
+  border: 1px solid #363b45;
+  border-radius: 6px;
+  padding: 9px;
+}
+.organizer-dialog fieldset {
+  border: 0;
+  padding: 0;
+  margin: 18px 0;
+}
+@media (max-width: 700px) {
+  .organizer-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .organizer-record,
+  .organizer-list > div:not(.actions):not(.pagination-controls) {
+    flex-direction: column;
+  }
+  .organizer-dialog .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .organizer-module .table-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .organizer-module .actions {
+    flex-wrap: wrap;
+  }
+}
+
+.organizer-alert-count {
+  font-size: 10px;
+  color: #e8b66b;
+  background: #a65f2025;
+  border-radius: 5px;
+  padding: 3px 5px;
+  white-space: nowrap;
+}

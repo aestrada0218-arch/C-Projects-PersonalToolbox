@@ -1,3 +1,4 @@
+import { carrierLink } from "../organizer/model";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Store } from "../database";
@@ -22,6 +23,19 @@ type Descriptor = {
 };
 // This is a fixed capability list, not a general Electron IPC bridge.
 export const workspaceMethods: Record<string, Descriptor> = {
+  organizerAlerts: { channel: "toolbox:organizer-alerts", read: true },
+  organizerState: {
+    channel: "toolbox:organizer-state",
+    read: true,
+    state: "organizerState",
+  },
+  saveOrganizer: { channel: "toolbox:organizer-save", state: "organizerState" },
+  deleteOrganizer: {
+    channel: "toolbox:organizer-delete",
+    state: "organizerState",
+  },
+  undoOrganizer: { channel: "toolbox:organizer-undo", state: "organizerState" },
+  createBackup: { channel: "toolbox:backup-create", state: "organizerState" },
   snapshot: { channel: "toolbox:snapshot", read: true, state: "snapshot" },
   addOrder: { channel: "toolbox:add-order", state: "snapshot" },
   updateOrder: {
@@ -266,6 +280,7 @@ export const workspaceMethods: Record<string, Descriptor> = {
 const digest = (v: unknown) =>
   createHash("sha256").update(JSON.stringify(v)).digest("hex");
 const stateChannels: Record<string, string> = {
+  organizerState: "toolbox:organizer-state",
   snapshot: "toolbox:snapshot",
   collectionState: "toolbox:collection-state",
   expenseState: "toolbox:expense-state",
@@ -413,6 +428,7 @@ export class WorkspaceGateway {
       "exportOrderText",
       "openCollectionUrl",
       "collectibleReferenceUrl",
+      "packageTrackingUrl",
       "openListingUrl",
       "copyListingText",
     ];
@@ -429,6 +445,7 @@ export class WorkspaceGateway {
         "exportOrderText",
         "openCollectionUrl",
         "collectibleReferenceUrl",
+        "packageTrackingUrl",
         "openListingUrl",
         "copyListingText",
       ].includes(method);
@@ -554,6 +571,13 @@ export class WorkspaceGateway {
             .snapshot()
             .orders.map((o) => keys.map((k) => cell(o[k])).join(",")),
         ].join("\r\n");
+      } else if (method === "packageTrackingUrl") {
+        const id = z.string().uuid().parse(args[0]),
+          r = this.store.organizer
+            .records()
+            .find((r) => r.id === id && r.kind === "package");
+        if (!r) throw Error("Package missing");
+        value = carrierLink(r.data);
       } else if (method === "collectibleReferenceUrl") {
         value = collectibleReference(this.store.collection.items(), args[0]);
       } else if (method === "openCollectionUrl") {

@@ -1,6 +1,8 @@
+import { carrierLink } from "./organizer/model";
+import { BackupManager } from "./organizer/backups";
 import { FileCompanionPreferences } from "./mobile/preferences";
 import { WorkspaceGateway, type DesktopAction } from "./mobile/workspace";
-import { nativeImage } from "electron";
+import { nativeImage, shell } from "electron";
 import { z } from "zod";
 import { safePhotoSize } from "./collection/photo";
 import { CompanionServer } from "./mobile/server";
@@ -30,6 +32,10 @@ let inbox: InboxService;
 let mailboxes: MailboxService;
 let store: Store;
 let companion: CompanionServer;
+let backups: BackupManager;
+let backupError: string | undefined;
+let restoreError: string | undefined;
+let backupTimer: ReturnType<typeof setInterval> | undefined;
 let unsubscribeDataChanges: (() => void) | undefined;
 let dataChangeTimer: ReturnType<typeof setTimeout> | undefined;
 const desktopActions = new Map<string, DesktopAction>();
@@ -70,11 +76,35 @@ function authorized(event: Electron.IpcMainInvokeEvent) {
     throw new Error("Unauthorized request");
 }
 function handle(channel: string, fn: (...args: any[]) => unknown) {
-  desktopActions.set(channel, fn);
+  const action = (...args: any[]) =>
+    store.withSource(
+      "Desktop",
+      channel,
+      () => {
+        if (
+          channel === "toolbox:clear-expenses" ||
+          (channel === "toolbox:outstanding-delete" &&
+            Array.isArray(args[0]?.ids) &&
+            args[0].ids.length > 1)
+        )
+          backups.create(store.exportBackup(), "pre-change");
+        if (
+          channel === "toolbox:collection-delete" ||
+          (channel === "toolbox:organizer-delete" &&
+            store.organizer
+              .records()
+              .some((r) => r.id === args[0]?.id && r.kind === "attachment"))
+        )
+          backups.create(store.exportBackup(), "pre-change");
+        return fn(...args);
+      },
+      true,
+    );
+  desktopActions.set(channel, action);
   ipcMain.handle(channel, async (event, ...args) => {
     authorized(event);
     try {
-      return await fn(...args);
+      return await action(...args);
     } catch {
       throw new Error(
         "Unable to complete request. Check the input and try again.",
@@ -87,9 +117,136 @@ else {
   app
     .whenReady()
     .then(async () => {
-      store = await Store.open(
-        join(app.getPath("userData"), "personal-toolbox.sqlite"),
+      const dataPath = join(app.getPath("userData"), "personal-toolbox.sqlite");
+      backups = new BackupManager(
+        join(app.getPath("userData"), "backups"),
+        dataPath,
+        await Store.backupValidator(),
       );
+      try {
+        backups.applyPending();
+      } catch {
+        restoreError =
+          "The requested restore could not complete. Review the saved backups and storage permissions; the app will open the database currently on disk.";
+      }
+      store = await Store.open(dataPath);
+      const dailyBackup = () => {
+        try {
+          backups.daily(store.exportBackup());
+          backupError = undefined;
+        } catch {
+          backupError =
+            "Automatic backup failed. Check free space and storage permissions.";
+        }
+      };
+      dailyBackup();
+      backupTimer = setInterval(dailyBackup, 3600000);
+      const organizerState = () => ({
+        ...store.organizer.state(),
+        backups: backups.list(),
+        backupError: backupError || restoreError,
+      });
+      const organizerResult = (fn: () => unknown) => {
+        try {
+          fn();
+          return { ok: true, state: organizerState() };
+        } catch (e) {
+          return {
+            ok: false,
+            error:
+              e instanceof z.ZodError
+                ? "Check the required fields, amounts and calendar dates."
+                : e instanceof Error &&
+                    !/SQL|constraint|ENOENT|EACCES|filesystem|UNIQUE/i.test(
+                      e.message,
+                    )
+                  ? e.message
+                  : "Could not save this change. Review the record and storage permissions.",
+            state: organizerState(),
+          };
+        }
+      };
+      handle("toolbox:organizer-state", organizerState);
+      handle("toolbox:organizer-alerts", () => {
+        const s = store.organizer.state(),
+          date = new Date(s.today + "T12:00:00Z");
+        date.setUTCDate(date.getUTCDate() + 7);
+        const until = date.toISOString().slice(0, 10);
+        return {
+          overdue: s.reminders.filter((r) => r.overdue).length,
+          dueSoon: s.reminders.filter(
+            (r) => r.date >= s.today && r.date <= until,
+          ).length,
+          duplicates: s.duplicates.length,
+          backupError: backupError || restoreError,
+        };
+      });
+      handle("toolbox:organizer-track", async (input) => {
+        const id = z.string().uuid().parse(input),
+          r = store.organizer
+            .records()
+            .find((r) => r.id === id && r.kind === "package");
+        if (!r) throw Error("Package missing");
+        await shell.openExternal(carrierLink(r.data));
+        return true;
+      });
+      handle("toolbox:organizer-save", (input) =>
+        organizerResult(() => store.organizer.save(input)),
+      );
+      handle("toolbox:organizer-delete", (input) =>
+        organizerResult(() => store.organizer.remove(input)),
+      );
+      handle("toolbox:organizer-undo", (id) =>
+        organizerResult(() => store.organizer.undo(id)),
+      );
+      handle("toolbox:backup-create", () =>
+        organizerResult(() => backups.create(store.exportBackup())),
+      );
+      handle("toolbox:backup-restore", async (input) => {
+        const id = z.string().max(200).parse(input);
+        backups.bytes(id);
+        const r = await dialog.showMessageBox(window, {
+          type: "warning",
+          buttons: ["Cancel", "Restore and restart"],
+          defaultId: 0,
+          cancelId: 0,
+          message: "Restore this backup?",
+          detail:
+            "Changes made since this backup will be replaced. A safety backup of the current database is created at the next launch. Credentials remain in Windows Credential Manager.",
+        });
+        if (r.response !== 1) return false;
+        backups.queueRestore(id);
+        if (dev)
+          app.relaunch({
+            args: process.argv.slice(1).filter((arg) => arg !== "--dev"),
+          });
+        else app.relaunch();
+        app.quit();
+        return true;
+      });
+      handle("toolbox:backup-export", async (input) => {
+        const id = z.string().max(200).parse(input),
+          bytes = backups.bytes(id);
+        const r = await dialog.showSaveDialog(window, {
+          defaultPath: "PersonalToolbox-backup.sqlite",
+          filters: [{ name: "Toolbox backup", extensions: ["sqlite"] }],
+        });
+        if (r.canceled || !r.filePath) return false;
+        await writeFile(r.filePath, bytes);
+        return true;
+      });
+      handle("toolbox:backup-import", async () => {
+        const r = await dialog.showOpenDialog(window, {
+          properties: ["openFile"],
+          filters: [{ name: "Toolbox backup", extensions: ["sqlite"] }],
+        });
+        if (r.canceled || !r.filePaths[0]) return organizerResult(() => {});
+        const { stat, readFile } = await import("node:fs/promises");
+        if ((await stat(r.filePaths[0])).size > 128 * 1024 * 1024)
+          throw Error("Backup too large");
+        const bytes = await readFile(r.filePaths[0]);
+        return organizerResult(() => backups.create(bytes, "import"));
+      });
       unsubscribeDataChanges = store.onChange(() => {
         clearTimeout(dataChangeTimer);
         dataChangeTimer = setTimeout(() => {
@@ -106,7 +263,14 @@ else {
         store,
         join(__dirname, "../../dist"),
         17863,
-        (device, input) => workspace.execute(device, input),
+        (device, input) =>
+          store.withSource(
+            "iPhone: " +
+              (companion.status().devices.find((d) => d.id === device)?.name ||
+                device.slice(0, 8)),
+            "Companion",
+            () => workspace.execute(device, input),
+          ),
         new FileCompanionPreferences(
           join(app.getPath("userData"), "companion-settings.json"),
         ),
@@ -316,6 +480,7 @@ else {
     if (process.platform !== "darwin") app.quit();
   });
   app.on("before-quit", () => {
+    clearInterval(backupTimer);
     unsubscribeDataChanges?.();
     clearTimeout(dataChangeTimer);
     companion?.shutdown();

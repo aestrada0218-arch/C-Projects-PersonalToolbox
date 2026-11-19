@@ -1,6 +1,6 @@
 # Add Personal Toolbox to your iPhone
 
-This is a private mobile web companion. No App Store account or Mac is needed. Your existing Windows app remains the source of truth and must stay open on an awake PC. Version 0.11.1 opens the **full toolbox** by default after pairing, using the same editors and validation as Windows:
+This is a private mobile web companion. No App Store account or Mac is needed. Your existing Windows app remains the source of truth and must stay open on an awake PC. Version 0.12 opens the **full toolbox** by default after pairing, using the same editors and validation as Windows:
 
 - Orders: add, edit, search, delete and export CSV.
 - Collection: search cards, add items, edit quantities/prices/sections, attach photos, delete items and refresh values.
@@ -9,6 +9,8 @@ This is a private mobile web companion. No App Store account or Mac is needed. Y
 - Tasks: add/edit/delete shipment tasks and update their status.
 - Inbox: connect and manage Gmail/IMAP inboxes, run supported checks and delete untracked email updates after confirmation. Deletion removes the Toolbox record only and prevents re-import of the same update.
 - Selling: manage drafts, add photos and use the existing eBay and assisted Mercari controls, including the same publish confirmations.
+
+- Organizer: record partial receiving/packages/returns, comic details and storage locations, wishlist items, item sale costs/payouts, monthly budgets and reminders. View change history and undo supported local changes. Create backups; restore/import/export remain on Windows.
 
 **Quick view** remains available for the compact companion. Phone changes save to the same database immediately. Connecting an account from the phone sends its credential over your private HTTPS connection to Windows Credential Manager; saved passwords and API keys are never returned to the phone.
 
@@ -22,7 +24,7 @@ npm install
 npm run dev
 ```
 
-Development startup now builds the companion assets automatically. For a production build use `npm run build` followed by `npm start`. The mobile companion remains disabled until you first enable it in Settings. After that it starts automatically with Personal Toolbox; Pause turns automatic startup off. Version 0.11.1 upgrades the database automatically and makes a pre-upgrade backup; existing records and pairing settings are preserved. Your existing Tailscale Serve configuration can stay in place. After updating Windows, refresh/reopen the iPhone app and pair again if prompted.
+Development startup now builds the companion assets automatically. For a production build use `npm run build` followed by `npm start`. The mobile companion remains disabled until you first enable it in Settings. After that it starts automatically with Personal Toolbox; Pause turns automatic startup off. Version 0.12 upgrades the database automatically and makes a pre-upgrade backup; existing records and pairing settings are preserved. Your existing Tailscale Serve configuration can stay in place. After updating Windows, refresh/reopen the iPhone app and pair again if prompted.
 
 ## 2. Connect your devices privately
 
@@ -71,6 +73,12 @@ Gmail scans, price requests and marketplace operations initiated from your phone
 An open phone editor keeps the version you started editing. If the same record changes on Windows, saving fails with a clear message instead of overwriting it. Close the editor, refresh, review the latest record and edit again. Repeating the same interrupted request is protected against duplicates for ten minutes; check saved data before starting another action. No edits are queued offline.
 
 Companion enabling, pairing-code generation and device revocation remain in **Windows Settings**. Phone Settings explains these controls. The phone cannot access arbitrary PC files, execute shell commands or read saved credentials.
+
+## Organizer and recovery
+
+Open **Organizer** from the navigation. Orders → Manage and Collection → Details, photos and costs open the corresponding records. Unified deadlines include existing outstanding items, shipment tasks and expense renewals. Carrier records and dates are manual; no tracking-service account is needed. Sale/payout records are bookkeeping only: they do not post listings, change inventory quantities or duplicate expenses automatically.
+
+Phone editors validate record revisions. Close, refresh and review a record if a PC edit causes a conflict. Undo also checks later edits and receiving dependencies; unsupported operations and large changes use backup recovery instead. The phone may request a new backup but restore/import/export require Windows. Photos and PDF receipts use the phone file picker (photos up to 15 MiB, PDFs up to 2 MiB, up to 12 per target).
 
 ## If it does not connect
 

@@ -1,3 +1,4 @@
+import OrganizerPanel, { type OrganizerRequest } from "./OrganizerPanel";
 import { Pagination, usePagination } from "./pagination";
 import { listenForDataChanges } from "./data-changes";
 import { localToday } from "./expense-types";
@@ -63,6 +64,7 @@ const nav = [
   ["Tasks", ListTodo],
   ["Inbox", Inbox],
   ["Expenses", Receipt],
+  ["Organizer", BriefcaseBusiness],
   ["Settings", Settings],
 ] as const;
 const empty: Snapshot = { orders: [], collection: [], tasks: [] };
@@ -73,6 +75,36 @@ const plans: Record<string, string> = {
 export default function App() {
   const [data, setData] = useState<Snapshot>(empty);
   const [page, setPage] = useState("Analytics");
+  const [organizerAlerts, setOrganizerAlerts] = useState<{
+    overdue: number;
+    dueSoon: number;
+    duplicates: number;
+    backupError?: string;
+  }>({ overdue: 0, dueSoon: 0, duplicates: 0 });
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      void window.toolbox
+        ?.organizerAlerts?.()
+        .then((s) => {
+          if (alive) setOrganizerAlerts(s);
+        })
+        .catch(() => {});
+    load();
+    const unsubscribe = listenForDataChanges(load),
+      timer = setInterval(load, 60000);
+    return () => {
+      alive = false;
+      unsubscribe();
+      clearInterval(timer);
+    };
+  }, []);
+  const [organizerRequest, setOrganizerRequest] =
+    useState<OrganizerRequest | null>(null);
+  const openOrganizer = (request: Omit<OrganizerRequest, "nonce">) => {
+    setOrganizerRequest({ ...request, nonce: Date.now() });
+    setPage("Organizer");
+  };
   const [collectionRequest, setCollectionRequest] = useState<{
     category: string;
     nonce: number;
@@ -271,7 +303,14 @@ export default function App() {
             <button
               key={name}
               className={page === name ? "active" : ""}
+              aria-label={name === "Organizer" ? "Organizer" : undefined}
+              title={
+                name === "Organizer"
+                  ? `${organizerAlerts.overdue} overdue · ${organizerAlerts.dueSoon} due within 7 days · ${organizerAlerts.duplicates} duplicate candidates`
+                  : undefined
+              }
               onClick={() => {
+                if (name === "Organizer") setOrganizerRequest(null);
                 if (name === "Collection") setCollectionRequest(null);
                 if (name === "Selling") setSellingRequest(null);
                 setPage(name);
@@ -281,6 +320,11 @@ export default function App() {
             >
               <Icon size={18} />
               <span>{name}</span>
+              {name === "Organizer" && organizerAlerts.overdue > 0 && (
+                <span className="organizer-alert-count" aria-hidden="true">
+                  {organizerAlerts.overdue} overdue
+                </span>
+              )}
               {name === "Orders" && <small>{data.orders.length}</small>}
               {name === "Analytics" && page === name && (
                 <span className="active-dot" />
@@ -298,7 +342,7 @@ export default function App() {
           </div>
           <div className="version">
             <span>Personal Toolbox</span>
-            <span>v0.11.1</span>
+            <span>v0.12.0</span>
           </div>
         </div>
       </aside>
@@ -316,7 +360,13 @@ export default function App() {
           </div>
         </header>
         <main>
-          {!["Expenses", "Collection", "Tasks", "Selling"].includes(page) && (
+          {![
+            "Expenses",
+            "Collection",
+            "Tasks",
+            "Selling",
+            "Organizer",
+          ].includes(page) && (
             <>
               {" "}
               <div className="title-row">
@@ -368,6 +418,14 @@ export default function App() {
                 onClick={() => setNotice("")}
               >
                 <X size={15} />
+              </button>
+            </div>
+          )}
+          {organizerAlerts.backupError && (
+            <div className="alert" role="alert">
+              {organizerAlerts.backupError}{" "}
+              <button onClick={() => openOrganizer({ section: "Backups" })}>
+                Review backups
               </button>
             </div>
           )}
@@ -731,6 +789,18 @@ export default function App() {
                               <td>
                                 <button
                                   className="text-button"
+                                  aria-label={`Manage order ${o.name}`}
+                                  onClick={() =>
+                                    openOrganizer({
+                                      section: "Orders",
+                                      orderId: o.id,
+                                    })
+                                  }
+                                >
+                                  Manage
+                                </button>
+                                <button
+                                  className="text-button"
                                   aria-label={"Edit order " + o.name}
                                   onClick={() => {
                                     window.toolbox?.captureEdit?.(o);
@@ -779,6 +849,9 @@ export default function App() {
               )}
               {page === "Collection" && (
                 <CollectionPanel
+                  onOrganize={(itemId) =>
+                    openOrganizer({ section: "Collection", itemId })
+                  }
                   onSell={(id) => {
                     setSellingRequest({ id, nonce: Date.now() });
                     setPage("Selling");
@@ -788,12 +861,33 @@ export default function App() {
                   categoryRequest={collectionRequest}
                 />
               )}
-              {page === "Expenses" && <ExpensesPanel />}
+              {page === "Organizer" && (
+                <OrganizerPanel request={organizerRequest} />
+              )}
+              {page === "Expenses" && (
+                <>
+                  <button
+                    className="text-button"
+                    onClick={() => openOrganizer({ section: "Finances" })}
+                  >
+                    Item profit, payouts and budgets →
+                  </button>
+                  <ExpensesPanel />
+                </>
+              )}
               {page === "Selling" && (
                 <SellingPanel
                   itemRequest={sellingRequest}
                   onChanged={refreshCollectionSnapshot}
                 />
+              )}
+              {page === "Tasks" && (
+                <button
+                  className="text-button"
+                  onClick={() => openOrganizer({ section: "Reminders" })}
+                >
+                  All deadlines and renewals →
+                </button>
               )}
               {page === "Tasks" && (
                 <TasksPanel
@@ -809,7 +903,15 @@ export default function App() {
                 window.toolbox?.mobileMode ? (
                   <MobileWorkspaceSettings />
                 ) : (
-                  <CompanionSettings />
+                  <>
+                    <button
+                      className="text-button"
+                      onClick={() => openOrganizer({ section: "Backups" })}
+                    >
+                      Backups, restore and change history →
+                    </button>
+                    <CompanionSettings />
+                  </>
                 )
               ) : (
                 plans[page] && (
@@ -838,7 +940,7 @@ export default function App() {
                   : "Local database connected"
                 : "Desktop connection required"}
             </span>
-            <span>v0.11.1 · Sample data included.</span>
+            <span>v0.12.0 · Sample data included.</span>
           </footer>
         </main>
       </div>
@@ -897,6 +999,22 @@ export default function App() {
           onSave={async (order) => {
             if (!window.toolbox)
               throw Error("Open the desktop app to save orders.");
+            if (
+              !editingOrder &&
+              data.orders.some(
+                (o) =>
+                  o.name.trim().toLowerCase() ===
+                    order.name.trim().toLowerCase() &&
+                  o.store.trim().toLowerCase() ===
+                    order.store.trim().toLowerCase() &&
+                  o.date === order.date &&
+                  o.total === order.total,
+              ) &&
+              !window.confirm(
+                "A matching order already exists. Save another purchase anyway?",
+              )
+            )
+              throw Error("Duplicate purchase was not saved.");
             setData(
               editingOrder
                 ? await window.toolbox.updateOrder({

@@ -1,3 +1,12 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+import { OrganizerRepository } from "./organizer/store";
+import { organizerMigration, schemas } from "./organizer/model";
+import {
+  capture,
+  recordHistory,
+  undoMethods,
+  validateOrganizerRelations,
+} from "./organizer/history";
 import { MailRepository } from "./mailboxes/store";
 import { mailMigration, outstandingMigration } from "./mailboxes/model";
 import { CollectionRepository } from "./collection/store";
@@ -44,6 +53,137 @@ export const orderSchema = z
   })
   .strict();
 export class Store {
+  private context = new AsyncLocalStorage<{ actor: string; method: string }>();
+  withSource<T>(
+    actor: string,
+    method: string,
+    fn: () => T,
+    inherit = false,
+  ): T {
+    return this.context.run(
+      {
+        actor: inherit ? this.context.getStore()?.actor || actor : actor,
+        method,
+      },
+      fn,
+    );
+  }
+  readonly organizer = new OrganizerRepository(
+    () => this.db,
+    (fn) => this.mutate(fn),
+    () => this,
+  );
+  exportBackup() {
+    return this.db.export();
+  }
+  static async backupValidator() {
+    const SQL = await initSqlJs({
+      locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm"),
+    });
+    return (bytes: Uint8Array) => {
+      if (bytes.byteLength > 128 * 1024 * 1024)
+        throw Error("Backup exceeds 128 MiB.");
+      const db = new SQL.Database(bytes);
+      try {
+        const v = Number(
+          db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0],
+        );
+        if (
+          !Number.isInteger(v) ||
+          v < 1 ||
+          v > 12 ||
+          !db.exec(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='orders'",
+          ).length
+        )
+          throw Error("Unsupported Toolbox backup.");
+        const required: [number, string, string[]][] = [
+          [
+            1,
+            "orders",
+            ["id", "name", "store", "category", "total", "status", "date"],
+          ],
+          [
+            1,
+            "collection",
+            ["id", "name", "category", "quantity", "purchase", "market"],
+          ],
+          [
+            2,
+            "shipments",
+            [
+              "id",
+              "tracking",
+              "carrier",
+              "status",
+              "received",
+              "subject",
+              "orderId",
+            ],
+          ],
+          [2, "inbox_account", ["id", "email", "auto", "lastSync"]],
+          [3, "inbox_updates", ["id", "externalId", "subject", "orderId"]],
+          [
+            4,
+            "expenses",
+            ["id", "description", "amountCents", "date", "scheduleId"],
+          ],
+          [
+            4,
+            "expense_schedules",
+            ["id", "anchorDate", "intervalMonths", "nextIndex", "active"],
+          ],
+          [5, "collection_settings", ["id", "connected"]],
+          [5, "collection_quotes", ["id", "itemId", "valueCents"]],
+          [6, "shipping_tasks", ["id", "name", "status"]],
+          [7, "selling_units", ["id", "collectionId"]],
+          [9, "mailboxes", ["id", "email", "host"]],
+          [9, "outstanding_orders", ["id", "transactionId", "receivedQty"]],
+          [11, "inbox_update_dismissals", ["externalId", "deletedAt"]],
+          [
+            12,
+            "organizer_records",
+            [
+              "id",
+              "kind",
+              "data",
+              "revision",
+              "createdAt",
+              "updatedAt",
+              "deletedAt",
+            ],
+          ],
+          [12, "toolbox_history", ["id", "patches", "undoable", "undoneAt"]],
+        ];
+        for (const [version, table, columns] of required)
+          if (v >= version) {
+            const names = (
+              db.exec(`PRAGMA table_info(${table})`)[0]?.values || []
+            ).map((r) => String(r[1]));
+            if (columns.some((c) => !names.includes(c)))
+              throw Error(
+                "This file does not contain a complete Toolbox database.",
+              );
+          }
+        if (v >= 12) {
+          const rows =
+            db.exec("SELECT kind,data FROM organizer_records")[0]?.values || [];
+          for (const row of rows) {
+            const schema = schemas[String(row[0]) as keyof typeof schemas];
+            if (!schema) throw Error("Unknown organizer record in backup.");
+            schema.strip().parse(JSON.parse(String(row[1])));
+          }
+        }
+        if (
+          db.exec("PRAGMA integrity_check")[0]?.values[0][0] !== "ok" ||
+          db.exec("PRAGMA foreign_key_check").length
+        )
+          throw Error("Backup integrity check failed.");
+      } finally {
+        db.close();
+      }
+    };
+  }
   private changeListeners = new Set<() => void>();
   onChange(listener: () => void) {
     this.changeListeners.add(listener);
@@ -106,7 +246,7 @@ export class Store {
     const version =
       this.db.exec("SELECT MAX(version) FROM migrations")[0]?.values[0][0] || 0;
     // v0.7 only added separate entry tables; retain them when rolling back.
-    if (Number(version) > 11) throw new Error("Unsupported database version");
+    if (Number(version) > 12) throw new Error("Unsupported database version");
     if (Number(version) < 1) {
       this.db.run(
         `BEGIN; CREATE TABLE orders(id TEXT PRIMARY KEY,name TEXT NOT NULL,store TEXT NOT NULL,category TEXT NOT NULL,total REAL NOT NULL CHECK(total>=0),status TEXT NOT NULL CHECK(status IN ('Delivered','In transit','Processing','Cancelled')),date TEXT NOT NULL); CREATE TABLE collection(id TEXT PRIMARY KEY,name TEXT NOT NULL,category TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),purchase REAL NOT NULL,market REAL NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO migrations VALUES(1);`,
@@ -263,6 +403,23 @@ export class Store {
       );
       this.persist();
     }
+    if (Number(version) < 12) {
+      if (
+        this.path &&
+        Number(version) > 0 &&
+        !existsSync(this.path + ".pre-organizer-v11.bak")
+      )
+        writeFileSync(this.path + ".pre-organizer-v11.bak", this.db.export(), {
+          flag: "wx",
+          mode: 0o600,
+        });
+      this.db.run(
+        "BEGIN;" +
+          organizerMigration +
+          "INSERT INTO migrations VALUES(12);COMMIT;",
+      );
+      this.persist();
+    }
   }
 
   private seed() {
@@ -380,9 +537,22 @@ export class Store {
   }
   private mutate<T>(fn: () => T): T {
     const before = this.db.export();
+    const oldRows = capture(this.db);
     this.db.run("BEGIN");
     try {
       const result = fn();
+      validateOrganizerRelations(this.db);
+      const context = this.context.getStore();
+      recordHistory(
+        this.db,
+        oldRows,
+        context?.method
+          .replace(/^toolbox:/, " ")
+          .replaceAll("-", " ")
+          .trim() || "Background update",
+        context?.actor || "Background",
+        undoMethods.has(context?.method || ""),
+      );
       this.db.run("COMMIT");
       this.persist();
       this.changed();

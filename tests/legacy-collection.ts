@@ -24,6 +24,6 @@ export function makeSellingV6(db: Database) {
 
 export function makeMailV8(db: Database) {
   db.run(
-    "DROP TABLE IF EXISTS outstanding_receipts;DROP TABLE IF EXISTS outstanding_orders;DROP TABLE IF EXISTS mail_cursors;DROP TABLE IF EXISTS mailboxes;ALTER TABLE collection DROP COLUMN purchaseDate;DROP TABLE IF EXISTS inbox_update_dismissals;DELETE FROM migrations WHERE version>=9;",
+    "DROP TABLE IF EXISTS outstanding_receipts;DROP TABLE IF EXISTS outstanding_orders;DROP TABLE IF EXISTS mail_cursors;DROP TABLE IF EXISTS mailboxes;ALTER TABLE collection DROP COLUMN purchaseDate;DROP TABLE IF EXISTS organizer_records;DROP TABLE IF EXISTS toolbox_history;DROP TABLE IF EXISTS inbox_update_dismissals;DELETE FROM migrations WHERE version>=9;",
   );
 }

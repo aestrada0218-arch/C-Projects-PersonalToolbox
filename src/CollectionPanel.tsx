@@ -70,11 +70,13 @@ type Modal =
   | { kind: "history"; item: OwnedCollectible; quotes: QuoteObservation[] };
 export default function CollectionPanel({
   onSell,
+  onOrganize,
   onChanged,
   productRequest,
   categoryRequest,
 }: {
   onSell: (id: string) => void;
+  onOrganize?: (id: string) => void;
   onChanged: () => void;
   productRequest: { id: string; nonce: number } | null;
   categoryRequest?: { category: string; nonce: number } | null;
@@ -822,6 +824,15 @@ export default function CollectionPanel({
                             )}
                             <div>
                               <strong>{item.name}</strong>
+                              {onOrganize && (
+                                <button
+                                  className="text-button"
+                                  aria-label={`Details and costs for ${item.name}`}
+                                  onClick={() => onOrganize(item.id)}
+                                >
+                                  Details, photos and costs →
+                                </button>
+                              )}
                               {item.purchaseDate && (
                                 <small>Purchased {item.purchaseDate}</small>
                               )}
@@ -1120,6 +1131,7 @@ export default function CollectionPanel({
             />
           ) : modal.kind === "manual" || modal.kind === "edit" ? (
             <ManualItemForm
+              owned={state.items}
               item={modal.kind === "edit" ? modal.item : undefined}
               defaultTab={
                 tab === "all" || tab === "outstanding" ? "other" : tab
@@ -1462,17 +1474,29 @@ function AddCatalogItem({
 }
 function ManualItemForm({
   item,
+  owned,
   defaultTab,
   busy,
   onSave,
   onCancel,
 }: {
   item?: OwnedCollectible;
+  owned: OwnedCollectible[];
   defaultTab: CollectionTab;
   busy: boolean;
   onSave: (input: ManualCollectible) => Promise<boolean>;
   onCancel: () => void;
 }) {
+  const [proposedName, setProposedName] = useState(item?.name || "");
+  const [proposedSection, setProposedSection] = useState(
+    item?.collectionType || defaultTab,
+  );
+  const possibleDuplicate = owned.some(
+    (i) =>
+      i.id !== item?.id &&
+      i.collectionType === proposedSection &&
+      i.name.trim().toLowerCase() === proposedName.trim().toLowerCase(),
+  );
   const [cost, setCost] = useState(
     item ? (item.purchaseCents / 100).toFixed(2) : "",
   );
@@ -1528,6 +1552,12 @@ function ManualItemForm({
         });
       }}
     >
+      {possibleDuplicate && (
+        <p className="notice" role="status">
+          Possible owned item: compare the issue, cover, printing and condition
+          before adding another purchase lot.
+        </p>
+      )}
       <fieldset disabled={busy || picking}>
         <label>
           Item name
@@ -1536,7 +1566,8 @@ function ManualItemForm({
             name="name"
             required
             maxLength={200}
-            defaultValue={item?.name}
+            value={proposedName}
+            onChange={(e) => setProposedName(e.target.value)}
             disabled={linked}
             placeholder="e.g. Comic title, issue #1"
           />
@@ -1547,7 +1578,10 @@ function ManualItemForm({
             <select
               aria-label="Collection section"
               name="collectionType"
-              defaultValue={item?.collectionType || defaultTab}
+              value={proposedSection}
+              onChange={(e) =>
+                setProposedSection(e.target.value as CollectionTab)
+              }
               disabled={linked}
             >
               <option value="cards">Trading cards</option>

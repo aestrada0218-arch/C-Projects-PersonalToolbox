@@ -42,7 +42,7 @@ it("opens a v0.7 database and preserves separate entry data while updating exist
     ).toBe("preserve@example.com");
     expect(
       raw.exec("SELECT MAX(version) FROM migrations")[0].values[0][0],
-    ).toBe(11);
+    ).toBe(12);
     raw.run("INSERT INTO migrations VALUES(999)");
     writeFileSync(file, raw.export());
     raw.close();

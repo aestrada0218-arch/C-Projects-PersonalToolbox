@@ -93,6 +93,8 @@ export function createMobileWorkspaceApi(
     if (!frozen.size) for (const [key, v] of latest) frozen.set(key, v);
   };
   const reads = new Set([
+    "organizerAlerts",
+    "organizerState",
     "snapshot",
     "collectionState",
     "expenseState",
@@ -107,6 +109,7 @@ export function createMobileWorkspaceApi(
     "exportOrderText",
     "openCollectionUrl",
     "collectibleReferenceUrl",
+    "packageTrackingUrl",
     "openListingUrl",
     "copyListingText",
   ]);
@@ -228,6 +231,12 @@ export function createMobileWorkspaceApi(
     }
   }
   const methods = [
+    "saveOrganizer",
+    "deleteOrganizer",
+    "undoOrganizer",
+    "createBackup",
+    "organizerAlerts",
+    "organizerState",
     "snapshot",
     "addOrder",
     "updateOrder",
@@ -423,6 +432,8 @@ export function createMobileWorkspaceApi(
     download("personal-toolbox-orders.csv", await rpc("exportOrderText"));
     return true;
   };
+  api.openPackageTracking = async (id: string) =>
+    open(await rpc("packageTrackingUrl", [id]));
   api.openCollectibleReference = async (id: string) =>
     open(await rpc("collectibleReferenceUrl", [id]));
   api.openCollectionProvider = async (url: string) =>
@@ -474,6 +485,9 @@ export function createMobileWorkspaceApi(
     },
   });
   api.companionStatus = async () => (await disabled()).state;
+  api.restoreBackup = disabled;
+  api.exportBackup = disabled;
+  api.importBackup = disabled;
   api.startCompanion = disabled;
   api.stopCompanion = disabled;
   api.pauseCompanion = disabled;

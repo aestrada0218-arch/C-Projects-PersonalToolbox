@@ -91,7 +91,7 @@ it("upgrades schema 10 with a backup and preserves existing inbox rows", async (
     });
     const raw = new SQL.Database(readFileSync(file));
     raw.run(
-      "DROP TABLE inbox_update_dismissals; DELETE FROM migrations WHERE version=11;",
+      "DROP TABLE organizer_records; DROP TABLE toolbox_history; DROP TABLE inbox_update_dismissals; DELETE FROM migrations WHERE version>=11;",
     );
     writeFileSync(file, raw.export());
     raw.close();
